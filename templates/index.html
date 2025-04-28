@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventory Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 50%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    button { margin-top: 20px; padding: 10px 15px; }
+  </style>
+</head>
+<body>
+  <h1>APD MAC Inventory Dashboard</h1>
+  <button onclick="refreshInventory()">Refresh Inventory</button>
+  <table id="inventory-table">
+    <thead>
+      <tr>
+        <th>Modules since start of V3B</th>
+        <th>Protomodules since start of V3B</th>
+        <th>Hexaboard usage</th>
+        <th>Baseplate usage</th>
+        <th>Sensor usage</th>
+      </tr>
+    </thead>
+    <tbody id="inventory-body">
+      <!-- Inventory rows will appear here -->
+    </tbody>
+  </table>
+
+  <script>
+    // Function to fetch inventory data from the backend
+    async function fetchInventory() {
+      const response = await fetch('/inventory');
+      if (!response.ok) {
+        console.error('Failed to fetch inventory data');
+        return {};
+      }
+      const data = await response.json();
+
+      return data[0];
+    }
+
+    // Function to refresh the inventory data on the page
+    async function refreshInventory() {
+      const data = await fetchInventory();
+      console.log("result:",data);
+      // Ensure the data returned has the correct structure
+      if (!data) return;
+
+      // Get the table body where rows will be populated
+      const tbody = document.getElementById('inventory-body');
+      tbody.innerHTML = ''; // Clear current rows
+
+      // Define the column headers and their corresponding keys in the data
+      const items = [
+        { name: "Modules since start of V3B", key: "module count" },
+        { name: "Protomodules since start of V3B", key: "protomodule count" },
+        { name: "Hexaboard usage", key: "hexaboard usage" },
+        { name: "Baseplate usage", key: "baseplate usage" },
+        { name: "Sensor usage", key: "sensor usage" }
+      ];
+
+      // Loop through the items and fill the table rows with data
+      const row = document.createElement('tr');
+      items.forEach(item => {
+        const cell = document.createElement('td');
+        cell.textContent = data[item.key] || 'N/A'; // Default to 'N/A' if no data is found for the key
+        row.appendChild(cell);
+      });
+      
+      tbody.appendChild(row);
+    }
+
+    // Initial load of inventory data when the page is first loaded
+    window.onload = refreshInventory;
+  </script>
+</body>
+</html>
