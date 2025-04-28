@@ -1,0 +1,1 @@
+Model for live monitoring of MAC inventory. Needs to be installed with proper dependencies, and configured to access local DB. Currently, DB access information is blocked out, but set up properly on daq2 machine.
