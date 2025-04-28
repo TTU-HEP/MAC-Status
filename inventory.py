@@ -18,9 +18,9 @@ app = FastAPI()
 
 templates = Jinja2Templates(directory="templates")
 
-parser.add_argument('date', type=str, help="date string")
-parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
-args = parser.parse_args()
+#parser.add_argument('date', type=str, help="date string")
+#parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
+#args = parser.parse_args()
 configuration = {}
 with open('dbase_info/conn.yaml', 'r') as file:
     configuration = yaml.safe_load(file)
@@ -30,7 +30,7 @@ async def inventory_tracker(ass_date_start):
             host = configuration['db_hostname'],
             database = configuration['dbname'],
             user = 'viewer', #configuration['postg']
-            password = 'mac' #configuration['DBPassword']
+            password = 'XXXX' #configuration['DBPassword']
         )
     ass_date = datetime.strptime(ass_date_start, '%Y-%m-%d').date()
     module_counting=f"""SELECT COUNT(*) from module_info WHERE assembled >= $1 ;"""
