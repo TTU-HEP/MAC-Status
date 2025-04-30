@@ -5,15 +5,25 @@
   <title>Inventory Dashboard</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 50%; margin-top: 20px; }
+    table { border-collapse: collapse; width: 60%; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background-color: #f2f2f2; }
     button { margin-top: 20px; padding: 10px 15px; }
+    .expandable { cursor: pointer; background-color: #f9f9f9; }
+    .hidden-row { display: none; background-color: #fcfcfc; }
+    .sub-cell { text-align: left; padding-left: 40px; }
   </style>
 </head>
 <body>
   <h1>APD MAC Inventory Dashboard</h1>
   <button onclick="refreshInventory()">Refresh Inventory</button>
+
+  <h2>Select Assembly Date</h2>
+  <input type="date" id="date-picker" value="2025-03-04" />
+  <button onclick="refreshPlot()">Regenerate plot with newest module info</button>
+  <img id="plot-image" src="data:image/png;base64,{{ image_base64 }}" alt="Plot Image" width="600px"/>
+
+
   <table id="inventory-table">
     <thead>
       <tr>
@@ -30,7 +40,6 @@
   </table>
 
   <script>
-    // Function to fetch inventory data from the backend
     async function fetchInventory() {
       const response = await fetch('/inventory');
       if (!response.ok) {
@@ -38,43 +47,95 @@
         return {};
       }
       const data = await response.json();
-
       return data[0];
     }
 
-    // Function to refresh the inventory data on the page
-    async function refreshInventory() {
-      const data = await fetchInventory();
-      console.log("result:",data);
-      // Ensure the data returned has the correct structure
-      if (!data) return;
+    function createExpandableRow(label, subItems, data) {
+      const mainCell = document.createElement('td');
+      mainCell.classList.add('expandable');
+      mainCell.textContent = label + ' ▼';
 
-      // Get the table body where rows will be populated
-      const tbody = document.getElementById('inventory-body');
-      tbody.innerHTML = ''; // Clear current rows
+      const subRow = document.createElement('tr');
+      subRow.classList.add('hidden-row');
 
-      // Define the column headers and their corresponding keys in the data
-      const items = [
-        { name: "Modules since start of V3B", key: "module count" },
-        { name: "Protomodules since start of V3B", key: "protomodule count" },
-        { name: "Hexaboard usage", key: "hexaboard usage" },
-        { name: "Baseplate usage", key: "baseplate usage" },
-        { name: "Sensor usage", key: "sensor usage" }
-      ];
-
-      // Loop through the items and fill the table rows with data
-      const row = document.createElement('tr');
-      items.forEach(item => {
-        const cell = document.createElement('td');
-        cell.textContent = data[item.key] || 'N/A'; // Default to 'N/A' if no data is found for the key
-        row.appendChild(cell);
+      const subCell = document.createElement('td');
+      subCell.colSpan = 5;
+      subItems.forEach(sub => {
+        const div = document.createElement('div');
+        div.className = 'sub-cell';
+        div.textContent = `${sub.label}: ${data[sub.key] || 'N/A'}`;
+        subCell.appendChild(div);
       });
-      
-      tbody.appendChild(row);
+
+      subRow.appendChild(subCell);
+
+      mainCell.addEventListener('click', () => {
+        subRow.style.display = subRow.style.display === 'none' ? 'table-row' : 'none';
+        mainCell.textContent = label + (subRow.style.display === 'none' ? ' ▼' : ' ▲');
+      });
+
+      return { mainCell, subRow };
     }
 
-    // Initial load of inventory data when the page is first loaded
+    async function refreshInventory() {
+      const data = await fetchInventory();
+      if (!data) return;
+
+      const tbody = document.getElementById('inventory-body');
+      tbody.innerHTML = '';
+
+      const row = document.createElement('tr');
+
+      // Static cells
+      const moduleCell = document.createElement('td');
+      moduleCell.textContent = data["module count"] || 'N/A';
+      const protomoduleCell = document.createElement('td');
+      protomoduleCell.textContent = data["protomodule count"] || 'N/A';
+      const sensorCell = document.createElement('td');
+      sensorCell.textContent = data["sensor usage"] || 'N/A';
+
+      // Expandable Hexaboard
+      const hexaboardInfo = [
+        { label: 'V3B', key: 'v3b' },
+        { label: 'V3C', key: 'v3c' }
+      ];
+      const { mainCell: hexaboardCell, subRow: hexaboardSubRow } = createExpandableRow('Hexaboard usage', hexaboardInfo, data);
+
+      // Expandable Baseplate
+      const baseplateInfo = [
+        { label: 'CuW', key: 'CuW' },
+        { label: 'Ti', key: 'Ti' }
+      ];
+      const { mainCell: baseplateCell, subRow: baseplateSubRow } = createExpandableRow('Baseplate usage', baseplateInfo, data);
+
+      // Assemble main row
+      row.appendChild(moduleCell);
+      row.appendChild(protomoduleCell);
+      row.appendChild(hexaboardCell);
+      row.appendChild(baseplateCell);
+      row.appendChild(sensorCell);
+
+      tbody.appendChild(row);
+      tbody.appendChild(hexaboardSubRow);
+      tbody.appendChild(baseplateSubRow);
+    }
+
     window.onload = refreshInventory;
+    
+    function refreshPlot() {
+      const assembDate = document.getElementById("date-picker").value;
+
+      // Make an API call to regenerate the plot and fetch the new image
+      fetch(`/get_plot_image?assemb_date=${assembDate}`)
+      .then(response => response.blob())
+      .then(imageBlob => {
+        const imageUrl = URL.createObjectURL(imageBlob);
+        document.getElementById('plot-image').src = imageUrl;
+      })
+      .catch(error => {
+        console.error('Error refreshing plot:', error);
+      });
+  }
   </script>
 </body>
 </html>
