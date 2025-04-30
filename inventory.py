@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+app = FastAPI()
 import asyncpg
 import asyncio
 import yaml
@@ -6,27 +8,29 @@ from datetime import datetime
 from array import array
 import uproot
 import matplotlib.pyplot as plt
-import argparse
+#import argparse
+import base64
+import io
 import numpy as np
 from summary_maker import *
-parser = argparse.ArgumentParser(description="Easy input of date.")
+#parser = argparse.ArgumentParser(description="Easy input of date.")
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse, HTMLResponse
+#from fastapi import FastAPI
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from fastapi import Request
-app = FastAPI()
+from fastapi import Request,Query
+#app = FastAPI()
 
 templates = Jinja2Templates(directory="templates")
 
-parser.add_argument('date', type=str, help="date string")
-parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
-args = parser.parse_args()
+#parser.add_argument('date', type=str, help="date string")
+#parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
+#args = parser.parse_args()
 configuration = {}
 with open('dbase_info/conn.yaml', 'r') as file:
     configuration = yaml.safe_load(file)
 
-async def inventory_tracker(ass_date_start):
+async def inventory_tracker(ass_date_start: str = Query(...)):
     conn = await asyncpg.connect(
             host = configuration['db_hostname'],
             database = configuration['dbname'],
@@ -51,7 +55,7 @@ async def inventory_tracker(ass_date_start):
     print("number of v3c used since start of v3b: ",v3c_count[0]['count'])
 
     v3b_counting=f"""SELECT COUNT(*) from hexaboard WHERE module_no >= 1 AND roc_version = 'HGCROCV3b-2' ;"""
-    v3b_sum=await conn.fetch("""SELECT COUNT(*) from hexaboard;""")
+    v3b_sum=await conn.fetch("""SELECT COUNT(*) from hexaboard WHERE roc_version = 'HGCROCV3b-2';""")
     v3b_total=v3c_sum[0]['count']
     v3b_count=await conn.fetch(v3b_counting)
     print("number of v3b used since start of v3b: ",v3b_count[0]['count'])
@@ -99,7 +103,7 @@ async def inventory_tracker(ass_date_start):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_page(request: Request, ass_date: str = Query("2025-03-04")):
-    ass_date = datetime.strptime(ass_date_start, '%Y-%m-%d').date()
+    #ass_date = datetime.strptime(ass_date, '%Y-%m-%d').date()
     module_names_array,v_info,i_info,adc_stdd,adc_mean =await fetch_module_info(ass_date,'mac')
     root_file_create(ass_date,module_names_array,v_info,i_info,adc_stdd,adc_mean) 
     fig=plot_summary('summary_since_'+ass_date+'.root',module_names_array,ass_date)
@@ -113,11 +117,11 @@ async def serve_page(request: Request, ass_date: str = Query("2025-03-04")):
 
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "image_url": "/get_plot_image?assemb_date=" + str(assemb_date)
+        "image_url": "/get_plot_image?assemb_date=" + str(ass_date)
     })
 @app.get("/get_plot_image")
 async def get_plot_image(assemb_date: str = Query(...)):
-    assemb_date = datetime.strptime(assemb_date, '%Y-%m-%d').date()
+    #assemb_date = datetime.strptime(assemb_date, '%Y-%m-%d').date()
 
     # Fetch data and generate the plot when the button is clicked or the image is requested
     module_names_array, v_info, i_info, adc_stdd, adc_mean = await fetch_module_info(assemb_date, 'mac')
