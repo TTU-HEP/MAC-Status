@@ -18,9 +18,9 @@ app = FastAPI()
 
 templates = Jinja2Templates(directory="templates")
 
-#parser.add_argument('date', type=str, help="date string")
-#parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
-#args = parser.parse_args()
+parser.add_argument('date', type=str, help="date string")
+parser.add_argument('--viewer_pwd', type=str, default='XXXXX', required=False, help="Viewer PSQL password")
+args = parser.parse_args()
 configuration = {}
 with open('dbase_info/conn.yaml', 'r') as file:
     configuration = yaml.safe_load(file)
@@ -30,14 +30,14 @@ async def inventory_tracker(ass_date_start):
             host = configuration['db_hostname'],
             database = configuration['dbname'],
             user = 'viewer', #configuration['postg']
-            password = 'XXXX' #configuration['DBPassword']
+            password = 'mac' #configuration['DBPassword']
         )
     ass_date = datetime.strptime(ass_date_start, '%Y-%m-%d').date()
     module_counting=f"""SELECT COUNT(*) from module_info WHERE assembled >= $1 ;"""
     module_count=await conn.fetch(module_counting,ass_date)
     print("number of modules assembled since start of v3b: ",module_count[0]['count'])
 
-    hxb_counting=f"""SELECT COUNT(*) from hexaboard WHERE module_no >= 1;"""
+    hxb_counting=f"""SELECT COUNT(*) from hexaboard WHERE module_no >= 1 AND roc_version != 'V3' ;"""
     hxb_sum=await conn.fetch("""SELECT COUNT(*) from hexaboard;""")
     hxb_total=hxb_sum[0]['count'] - 12
     hxb_count=await conn.fetch(hxb_counting)
