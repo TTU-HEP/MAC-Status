@@ -117,7 +117,12 @@
     <h2>Select Assembly Date</h2>
     <input type="date" id="date-picker" value="2025-03-04" />
     <button onclick="refreshPlot()">Regenerate plot with newest module info</button>
-    <img id="plot-image" src="data:image/png;base64,{{ image_base64 }}" alt="Plot Image" width="600px"/>
+    
+    <div id="plot-container" style="display: flex; justify-content: space-around; gap: 20px; margin-top: 20px;">
+      <img id="plot-image-1" src="data:image/png;base64,{{ image_base64_1 }}" alt="Plot Image 1" width="300px"/>
+      <img id="plot-image-2" src="data:image/png;base64,{{ image_base64_2 }}" alt="Plot Image 2" width="300px"/>
+      <img id="plot-image-3" src="data:image/png;base64,{{ image_base64_3 }}" alt="Plot Image 3" width="300px"/>
+    </div>
   </div>  
 
   
@@ -209,11 +214,31 @@
       const assembDate = document.getElementById("date-picker").value;
 
       // Make an API call to regenerate the plot and fetch the new image
-      fetch(`/get_plot_image?assemb_date=${assembDate}`)
+      fetch(`/get_plot_image_1?assemb_date=${assembDate}`)
       .then(response => response.blob())
       .then(imageBlob => {
         const imageUrl = URL.createObjectURL(imageBlob);
-        document.getElementById('plot-image').src = imageUrl;
+        document.getElementById('plot-image-1').src = imageUrl;
+      })
+      .catch(error => {
+        console.error('Error refreshing plot:', error);
+      });
+
+      fetch(`/get_plot_image_2?assemb_date=${assembDate}`)
+      .then(response => response.blob())
+      .then(imageBlob => {
+        const imageUrl = URL.createObjectURL(imageBlob);
+        document.getElementById('plot-image-2').src = imageUrl;
+      })
+      .catch(error => {
+        console.error('Error refreshing plot:', error);
+      });
+
+      fetch(`/get_plot_image_3?assemb_date=${assembDate}`)
+      .then(response => response.blob())
+      .then(imageBlob => {
+        const imageUrl = URL.createObjectURL(imageBlob);
+        document.getElementById('plot-image-3').src = imageUrl;
       })
       .catch(error => {
         console.error('Error refreshing plot:', error);

@@ -56,7 +56,7 @@ async def inventory_tracker(ass_date_start: str = Query(...)):
 
     v3b_counting=f"""SELECT COUNT(*) from hexaboard WHERE module_no >= 1 AND roc_version = 'HGCROCV3b-2' ;"""
     v3b_sum=await conn.fetch("""SELECT COUNT(*) from hexaboard WHERE roc_version = 'HGCROCV3b-2';""")
-    v3b_total=v3c_sum[0]['count']
+    v3b_total=v3b_sum[0]['count']
     v3b_count=await conn.fetch(v3b_counting)
     print("number of v3b used since start of v3b: ",v3b_count[0]['count'])
 
@@ -107,34 +107,56 @@ async def serve_page(request: Request, ass_date: str = Query("2025-03-04")):
     module_names_array,v_info,i_info,adc_stdd,adc_mean =await fetch_module_info(ass_date,'mac')
     root_file_create(ass_date,module_names_array,v_info,i_info,adc_stdd,adc_mean) 
     fig=plot_summary('summary_since_'+ass_date+'.root',module_names_array,ass_date)
-
+    fig2=mean_summary('summary_since_'+ass_date+'.root',module_names_array,ass_date)
+    fig3=std_summary('summary_since_'+ass_date+'.root',module_names_array,ass_date)
 
     # Convert to base64
     buf = io.BytesIO()
     fig.savefig(buf, format='png')
     buf.seek(0)
-    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    image_base64_1 = base64.b64encode(buf.read()).decode('utf-8')
+
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format='png')
+    buf2.seek(0)
+    image_base64_2 = base64.b64encode(buf2.read()).decode('utf-8')
+
+    buf3 = io.BytesIO()
+    fig3.savefig(buf3, format='png')
+    buf3.seek(0)
+    image_base64_3 = base64.b64encode(buf3.read()).decode('utf-8')
 
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "image_url": "/get_plot_image?assemb_date=" + str(ass_date)
+        "image_base64_1": iamge_base64_1,
+        "image_base64_2": iamge_base64_2,
+        "image_base64_3": iamge_base64_3,
+
     })
-@app.get("/get_plot_image")
-async def get_plot_image(assemb_date: str = Query(...)):
-    #assemb_date = datetime.strptime(assemb_date, '%Y-%m-%d').date()
-
-    # Fetch data and generate the plot when the button is clicked or the image is requested
-    module_names_array, v_info, i_info, adc_stdd, adc_mean = await fetch_module_info(assemb_date, 'mac')
-    root_file_create(assemb_date, module_names_array, v_info, i_info, adc_stdd, adc_mean)
-    fig = plot_summary(f'summary_since_{assemb_date}.root', module_names_array, assemb_date)
-
-    # Convert plot to a BytesIO buffer for streaming
+@app.get("/get_plot_image_1")
+async def get_plot_image_1(assemb_date: str = Query(...)):
+    fig = plot_summary(...)
     buf = io.BytesIO()
     fig.savefig(buf, format='png')
     buf.seek(0)
-
-    # Stream the image directly as PNG
     return StreamingResponse(buf, media_type="image/png")
+
+@app.get("/get_plot_image_2")
+async def get_plot_image_2(assemb_date: str = Query(...)):
+    fig2 = mean_summary(...)
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format='png')
+    buf2.seek(0)
+    return StreamingResponse(buf2, media_type="image/png")
+
+@app.get("/get_plot_image_3")
+async def get_plot_image_3(assemb_date: str = Query(...)):
+    fig3 = std_summary(...)
+    buf3 = io.BytesIO()
+    fig3.savefig(buf3, format='png')
+    buf3.seek(0)
+    return StreamingResponse(buf3, media_type="image/png")
+
 
 
 #@app.get("/", response_class=HTMLResponse)
