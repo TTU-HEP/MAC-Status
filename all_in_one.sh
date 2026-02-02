@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "ERROR: Bash 4+ required. You are using Bash ${BASH_VERSION}"
+  echo "On macOS: brew install bash"
+  exit 1
+fi
+
 # =========================
 # Database configuration
 # =========================
@@ -9,6 +15,13 @@ DB_HOST="129.118.107.198"
 DB_PORT="5432"
 DB_USER="viewer"
 DB_NAME="ttu_mac_local"
+
+if [[ -z "$PGPASSWORD" ]]; then
+  echo -n "Database password (leave blank if none): "
+  read -s DB_PASSWORD
+  echo
+  [[ -n "$DB_PASSWORD" ]] && export PGPASSWORD="$DB_PASSWORD"
+fi
 
 PSQL_CMD="psql -x -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -Atc"
 PSQL_META_CMD="psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -Atc"
