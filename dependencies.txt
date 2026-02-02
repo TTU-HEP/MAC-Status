@@ -1,0 +1,8 @@
+# PostgreSQL async driver
+asyncpg>=0.27.0
+
+# YAML parser
+PyYAML>=6.0
+
+# Plotting
+matplotlib>=3.7.0

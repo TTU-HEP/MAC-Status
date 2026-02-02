@@ -1,0 +1,5 @@
+dbname: 'ttu_mac_local'
+port: '5432'
+db_hostname: '129.118.107.198' 
+institution_abbr: 'TTU' ## update this: CMU, IHEP, NTU, TTU, TIFR, UCSB
+DBPassword: 'mac'
