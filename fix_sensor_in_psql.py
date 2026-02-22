@@ -29,27 +29,27 @@ INSERT INTO sensor (
     sen_batch_id,
     date_verify_received
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (sen_name) DO NOTHING;
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
 """
-
-
 def main():
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
+    cursor.execute("SELECT sen_name FROM sensor;")
+    existing_sensors = {row[0] for row in cursor.fetchall()}
+
     inserted_count = 0
+    skipped_count = 0
 
     with open(csv_file_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile)
 
         for row in reader:
 
-            # Ensure row is long enough
             if len(row) <= max(sen_name_column_index, ttu_column_index, batch_column_index):
                 continue
 
-            # ✅ Only process TTU rows
+            # Only TTU rows
             if row[ttu_column_index] != "TTU":
                 continue
 
@@ -59,15 +59,17 @@ def main():
             if not sen_name:
                 continue
 
-            # ---- Set static / derived values ----
+            # Skip if already exists
+            if sen_name in existing_sensors:
+                skipped_count += 1
+                continue
+
             geometry = "Full"
             resolution = "LD"
             thickness = 200
             grade = "A"
             kind = "200um Si Sensor LD Full"
-
-            today = datetime.today()
-            date_verify_received = today.date()
+            date_verify_received = datetime.today().date()
 
             cursor.execute(insert_query, (
                 sen_name,
@@ -80,14 +82,16 @@ def main():
                 date_verify_received
             ))
 
-            inserted_count += cursor.rowcount  # only counts if actually inserted
+            existing_sensors.add(sen_name)  # prevent duplicates within same CSV
+            inserted_count += 1
 
     conn.commit()
     cursor.close()
     conn.close()
 
     print("------ SUMMARY ------")
-    print(f"Inserted new sensors: {inserted_count}")
+    print(f"Inserted: {inserted_count}")
+    print(f"Skipped (already existed): {skipped_count}")
 
 
 if __name__ == "__main__":
