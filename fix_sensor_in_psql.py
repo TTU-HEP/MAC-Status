@@ -19,7 +19,7 @@ DB_CONFIG = {
 }
 
 insert_query = """
-INSERT INTO sensors (
+INSERT INTO sensor (
     sen_name,
     geometry,
     resolution,
