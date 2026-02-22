@@ -53,9 +53,14 @@ def main():
             if row[ttu_column_index] != "TTU":
                 continue
 
-            sen_name = row[sen_name_column_index]
+            # sen_name = row[sen_name_column_index]
             sen_batch_id = row[batch_column_index]
 
+            sen_name_raw = row[sen_name_column_index].strip()
+            if not sen_name_raw:
+                continue
+
+            sen_name = f"{sen_name_raw}_0"
             if not sen_name:
                 continue
 
