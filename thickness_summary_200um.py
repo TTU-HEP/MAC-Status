@@ -133,8 +133,9 @@ def plot_combined_distribution(thickness, title):
 # Friendly UI helpers
 # ----------------------------------------
 def prompt_protos():
-    raw = input("\nEnter proto names (comma separated):\n> ")
-    return [p.strip() for p in raw.split(",") if p.strip()]
+    path = input("Enter proto file path:\n> ").strip()
+    with open(path) as f:
+        return [l.strip() for l in f if l.strip()]
 
 
 # ----------------------------------------
