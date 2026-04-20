@@ -14,7 +14,7 @@ DB_CONFIG = {
     "host": "129.118.107.198",
     "dbname": "ttu_mac_local",
     "user": "postgres",
-    "password": "ttulovescalox",
+    "password": "xxxxxx",
     "port": 5432
 }
 
