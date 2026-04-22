@@ -2,6 +2,8 @@ import asyncio
 import asyncpg
 import yaml
 from datetime import datetime
+import matplotlib
+matplotlib.use("MacOSX")          # native macOS backend; falls back gracefully
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -14,19 +16,16 @@ with open('dbase_info/conn.yaml', 'r') as file:
     configuration = yaml.safe_load(file)
 
 # ----------------------------------------
-# Credential handling (Bash-style)
+# Credential handling
 # ----------------------------------------
 def resolve_db_password():
-    # 1) Environment variable wins
     if os.getenv("PGPASSWORD"):
         return os.getenv("PGPASSWORD")
 
-    # 2) YAML fallback (optional)
     pwd = configuration.get("DBPassword")
     if pwd:
         return pwd
 
-    # 3) Interactive prompt (silent)
     print("Database password (leave blank if none): ", end="", flush=True)
     entered = getpass.getpass("")
     if entered:
@@ -37,14 +36,14 @@ def resolve_db_password():
 
 
 def maybe_save_plot(fig, default_name):
+    if fig is None:
+        return
     while True:
         choice = input(f"Save plot '{default_name}'? [y/N]: ").strip().lower()
         if choice in ('y', 'yes'):
-            # Ask for filename (default available)
             filename = input(f"Enter filename (default: {default_name}.png): ").strip()
             if not filename:
                 filename = default_name
-            # Ensure it ends with .png
             if not filename.endswith(".png"):
                 filename += ".png"
             fig.savefig(filename, bbox_inches='tight')
@@ -109,15 +108,16 @@ async def fetch_latest_measurements(conn, module_names):
             name
         )
 
-        v_info[name] = v['meas_v'] if v else []
-        i_info[name] = i['meas_i'] if i else []
-        adc_stdd[name] = std['adc_stdd'] if std else []
-        adc_mean[name] = mean['adc_mean'] if mean else []
-
+        v_info[name]   = [abs(float(x)) for x in v['meas_v']]     if v    else []
+        i_info[name]   = [float(x) for x in i['meas_i']]     if i    else []
+        adc_stdd[name] = [float(x) for x in std['adc_stdd']] if std  else []
+        adc_mean[name] = [float(x) for x in mean['adc_mean']]if mean else []
+        print("vinfo = ", v_info)
+        print("iinfo = ", i_info)
     return v_info, i_info, adc_stdd, adc_mean
 
 # ----------------------------------------
-# Plotting
+# Plotting  (each function now returns fig)
 # ----------------------------------------
 def plot_iv_summary(modules, v_info, i_info, label):
     fig, ax = plt.subplots()
@@ -131,7 +131,9 @@ def plot_iv_summary(modules, v_info, i_info, label):
     ax.set_ylabel('I [A]')
     ax.set_title(f'IV Summary ({label})')
     ax.legend(fontsize='small')
-    plt.show()
+    plt.show(block=False)
+    return fig                    # ← was missing
+
 
 def plot_adc_hist(modules, data, title, xlabel, xlim):
     fig, ax = plt.subplots()
@@ -144,7 +146,8 @@ def plot_adc_hist(modules, data, title, xlabel, xlim):
     ax.set_ylabel('Frequency')
     ax.set_title(title)
     ax.legend(fontsize='small')
-    plt.show()
+    plt.show(block=False)
+    return fig                    # ← was missing
 
 # ----------------------------------------
 # Friendly UI helpers
@@ -194,7 +197,7 @@ How would you like to select modules?
 
         if choice == "1":
             start = prompt_date("Start date (YYYY-MM-DD): ")
-            end = prompt_date("End date   (YYYY-MM-DD): ")
+            end   = prompt_date("End date   (YYYY-MM-DD): ")
             modules = await fetch_modules_by_date(conn, start, end)
             label = f"{start} → {end}"
 
@@ -214,23 +217,32 @@ How would you like to select modules?
         v_info, i_info, adc_stdd, adc_mean = await fetch_latest_measurements(
             conn, modules
         )
+        print("vinfo = ", v_info)
+        print("iinfo = ", i_info)
+
+        safe_label = label.replace(' ', '_').replace('→', 'to')
 
         fig_iv = plot_iv_summary(modules, v_info, i_info, label)
-        maybe_save_plot(fig_iv, f"iv_summary_{label.replace(' ', '_')}")
+        maybe_save_plot(fig_iv, f"iv_summary_{safe_label}")
 
         fig_noise = plot_adc_hist(
             modules, adc_stdd,
             f"ADC Noise Summary ({label})",
             "ADC Standard Deviation", (0, 50)
         )
-        maybe_save_plot(fig_noise, f"adc_noise_{label.replace(' ', '_')}")
+        maybe_save_plot(fig_noise, f"adc_noise_{safe_label}")
 
         fig_mean = plot_adc_hist(
             modules, adc_mean,
             f"ADC Mean Summary ({label})",
             "ADC Mean", (0, 500)
         )
-        maybe_save_plot(fig_mean, f"adc_mean_{label.replace(' ', '_')}")
+        maybe_save_plot(fig_mean, f"adc_mean_{safe_label}")
+
+        # Keep windows open until the user is done with them
+        plt.pause(0.001)
+        input("\nPress Enter to continue…")
+        plt.close('all')
 
 # ----------------------------------------
 if __name__ == "__main__":
