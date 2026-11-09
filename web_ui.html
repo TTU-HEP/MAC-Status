@@ -97,6 +97,18 @@
 
   .tokens { font-size:11px; color:var(--muted); margin-top:8px; }
 
+  .caption { font-size:13.5px; }
+  .caption p:first-child { margin-top:.2em; }
+  details.more summary {
+    cursor:pointer; color:var(--accent); font-size:12.5px; font-weight:600;
+    list-style:none; margin-top:4px; display:inline-flex; align-items:center; gap:5px;
+  }
+  details.more summary::before { content:"▸"; transition:transform .2s; }
+  details.more[open] summary::before { transform:rotate(90deg); }
+  details.more .when-open { display:none; }
+  details.more[open] .when-open { display:inline; }
+  details.more[open] .when-closed { display:none; }
+
   details.table-box { margin:10px 0 4px; }
   details.table-box summary {
     cursor:pointer; font-size:12.5px; color:var(--accent); font-weight:600;
@@ -187,12 +199,8 @@
     <div class="msg bot">
       <div class="avatar">⬡</div>
       <div class="bubble">
-        <p>Hi! I answer questions about the TTU MAC database — modules,
-        hexaboards, sensors, baseplates, protomodules, test results, grades
-        and plots. I'm <b>read-only</b>.</p>
-        <p style="color:var(--muted); font-size:13px">Try: <i>"modules assembled
-        last week"</i> · <i>"IV grade for 320MLF3WDTT0099"</i> ·
-        <i>"show the hexplot for the latest inspection"</i></p>
+        <p>Ask me about the TTU MAC database — modules, hexaboards, sensors,
+        tests, grades, plots. <b>Read-only.</b></p>
       </div>
     </div>
   </div>
@@ -278,6 +286,18 @@ function md(text) {
   return html;
 }
 
+/* short caption first; anything longer folds behind a "see more" button */
+function answerHtml(answer) {
+  const paras = answer.split(/\n{2,}/);
+  const caption = paras[0] || '';
+  const rest = paras.slice(1).join('\n\n').trim();
+  let html = `<div class="caption">${md(caption)}</div>`;
+  if (rest) {
+    html += `<details class="more"><summary><span class="when-closed">see more</span><span class="when-open">see less</span></summary>${md(rest)}</details>`;
+  }
+  return html;
+}
+
 const IMG_RE = /^&lt;\w+ image, [\d.]+ kB -&gt; \S*agent_plots\/([^&\s]+)&gt;$/;
 
 function cellHtml(v) {
@@ -333,7 +353,7 @@ async function ask() {
       else if (ev.type === 'table') html += tableHtml(ev);
       else if (ev.type === 'notice') html += `<div class="notice">${esc(ev.text)}</div>`;
     }
-    if (data.answer) html += md(data.answer);
+    if (data.answer) html += answerHtml(data.answer);
     if (data.error) html += `<div class="notice">${esc(data.error)}</div>`;
     if (data.tokens && data.tokens.query) {
       html += `<div class="tokens">tokens — this query: ${data.tokens.query.toLocaleString()} ·
