@@ -36,7 +36,7 @@ Each answer ends with a token-usage line, and usage is capped: 100k tokens per q
 python3 web_ui.py
 ```
 
-Result tables render inline (stored images and sketched plots are displayed large with row fields as small captions, outlier counts highlighted), SQL stays hidden unless the "show SQL" toggle is on, token usage shows under each reply, and four pastel themes (Lavender, Mint, Peach, Sky) are switchable in the header. Port via `MAC_AGENT_UI_PORT`.
+Result tables render inline (stored images and sketched plots are displayed large with row fields as small captions, outlier counts highlighted), SQL stays hidden unless the "show SQL" toggle is on, token usage shows under each reply, and four pastel themes (Lavender, Mint, Peach, Sky) are switchable in the header. Quick-link chips under the header show, without using any model tokens: live lab RH/temperature and MMTS temperature/dew-point plots for the past 6 hours (click again to refresh), and a module-production summary per type and final grade (latest grading run per module). Port via `MAC_AGENT_UI_PORT`.
 
 **Summary plotting tools**
 

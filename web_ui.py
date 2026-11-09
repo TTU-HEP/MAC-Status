@@ -154,6 +154,127 @@ async def api_status(request):
     })
 
 
+# ----------------------------------------
+# Quick-link endpoints (fixed read-only SQL, no model tokens)
+# ----------------------------------------
+async def _fetch_all(sql, *args):
+    """Uncapped read-only fetch for the fixed quick-link queries."""
+    import asyncpg
+    conn = await asyncpg.connect(**DB._conn_kwargs)
+    try:
+        async with conn.transaction(readonly=True):
+            return await conn.fetch(sql, *args)
+    finally:
+        await conn.close()
+
+
+def _render_env_png(source, rows, hours):
+    import io
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import dates as mdates
+
+    if source == "lab":
+        panels = [("Temperature (°C)", "temp"), ("Relative humidity (%)", "rh")]
+        key = "loc"
+        suptitle = f"Lab environment — past {hours} h"
+    else:
+        panels = [("Temperature (°C)", "temperature_C"),
+                  ("Dew point (°C)", "dewpoint_C")]
+        key = "dev"
+        suptitle = f"MMTS environment — past {hours} h"
+
+    fig, axes = plt.subplots(len(panels), 1, figsize=(9, 6), sharex=True,
+                             layout="constrained")
+    locator = mdates.AutoDateLocator()
+    formatter = mdates.ConciseDateFormatter(locator)
+    for ax, (label, sel) in zip(axes, panels):
+        groups = {}
+        for r in rows:
+            if source == "lab":
+                val = r[sel]
+            else:
+                if r["metric"] != sel:
+                    continue
+                val = r["v"]
+            if val is None:
+                continue
+            groups.setdefault(r[key], []).append((r["t"], float(val)))
+        for name in sorted(groups):
+            pts = groups[name]
+            ax.plot([p[0] for p in pts], [p[1] for p in pts],
+                    linewidth=1.2, label=name)
+        ax.set_ylabel(label, fontsize=9)
+        ax.grid(alpha=0.25)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(fontsize=7, frameon=False, loc="upper left",
+                      ncol=max(1, len(labels) // 6))
+        if not groups:
+            ax.text(0.5, 0.5, "no data in window", transform=ax.transAxes,
+                    ha="center", color="#999")
+    fig.suptitle(suptitle, fontsize=11)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+async def api_env_plot(request):
+    source = request.query.get("source", "lab")
+    hours = min(max(int(request.query.get("hours", "6")), 1), 48)
+    if source == "lab":
+        rows = await _fetch_all(f"""
+            SELECT date_trunc('minute', log_timestamp) AS t,
+                   log_location AS loc,
+                   avg(temp_c) AS temp, avg(rel_hum) AS rh
+            FROM temp_humidity
+            WHERE log_timestamp > now() - interval '{hours} hours'
+            GROUP BY 1, 2 ORDER BY 1;""")
+    else:
+        source = "mmts"
+        rows = await _fetch_all(f"""
+            SELECT date_trunc('minute', log_timestamp) AS t,
+                   device_name AS dev, metric, avg(value) AS v
+            FROM mmts_sensors_logging
+            WHERE metric IN ('temperature_C', 'dewpoint_C')
+              AND log_timestamp > now() - interval '{hours} hours'
+            GROUP BY 1, 2, 3 ORDER BY 1;""")
+    png = await asyncio.to_thread(_render_env_png, source, rows, hours)
+    return web.Response(body=png, content_type="image/png",
+                        headers={"Cache-Control": "no-store"})
+
+
+async def api_production(request):
+    rows = await _fetch_all("""
+        WITH latest AS (
+          SELECT DISTINCT ON (q.module_no) q.module_no, q.final_grade
+          FROM module_qc_summary q
+          ORDER BY q.module_no, q.grade_timestamp DESC NULLS LAST,
+                   q.mod_qc_no DESC
+        )
+        SELECT left(m.module_name, 9) AS type,
+          count(*) AS total,
+          count(*) FILTER (WHERE l.final_grade = 'A') AS "A",
+          count(*) FILTER (WHERE l.final_grade = 'B') AS "B",
+          count(*) FILTER (WHERE l.final_grade = 'C') AS "C",
+          count(*) FILTER (WHERE l.final_grade = 'F') AS "F",
+          count(*) FILTER (WHERE l.module_no IS NOT NULL
+                           AND l.final_grade IS NULL) AS "no grade",
+          count(*) FILTER (WHERE l.module_no IS NULL) AS ungraded
+        FROM module_info m LEFT JOIN latest l USING (module_no)
+        GROUP BY 1 ORDER BY total DESC;""")
+    columns = (["type", "total", "A", "B", "C", "F", "no grade", "ungraded"]
+               if rows else [])
+    return web.json_response({
+        "columns": columns,
+        "rows": [[str(r[c]) for c in columns] for r in rows],
+    })
+
+
 async def index(request):
     return web.FileResponse(os.path.join(HERE, "web_ui.html"))
 
@@ -200,6 +321,8 @@ def main():
     app.router.add_get("/", index)
     app.router.add_post("/api/ask", api_ask)
     app.router.add_get("/api/status", api_status)
+    app.router.add_get("/api/env_plot", api_env_plot)
+    app.router.add_get("/api/production", api_production)
     os.makedirs(base.PLOTS_DIR, exist_ok=True)
     app.router.add_static("/plots/", base.PLOTS_DIR)
     app.on_startup.append(on_startup)

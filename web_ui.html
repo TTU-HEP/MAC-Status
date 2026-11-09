@@ -66,6 +66,15 @@
   }
   .toggle input { accent-color: var(--accent); }
 
+  .quick { display:flex; gap:8px; flex-wrap:wrap; padding:2px 0 0; width:100%; }
+  .ql {
+    border:1px solid var(--border); background:var(--panel); color:var(--accent);
+    font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;
+    border-radius:16px; padding:5px 13px; box-shadow:0 1px 2px rgba(60,50,90,.05);
+    transition:background .15s;
+  }
+  .ql:hover { background:var(--accent-soft); }
+
   .chat { display:flex; flex-direction:column; gap:18px; padding-top:14px; }
 
   .msg { display:flex; gap:10px; max-width:100%; }
@@ -201,6 +210,11 @@
       <button class="theme-pill tp-mint active" data-theme="mint"  aria-label="Mint"></button>
       <button class="theme-pill tp-peach"    data-theme="peach"    aria-label="Peach"></button>
       <button class="theme-pill tp-sky"      data-theme="sky"      aria-label="Sky"></button>
+    </div>
+    <div class="quick">
+      <button class="ql" data-env="lab">🌡 Lab RH/T</button>
+      <button class="ql" data-env="mmts">🌡 MMTS T</button>
+      <button class="ql" id="qlProd">📊 Production summary</button>
     </div>
   </header>
 
@@ -402,6 +416,37 @@ async function ask() {
   bubble.scrollIntoView({behavior: 'smooth', block: 'end'});
   input.focus();
 }
+
+/* quick links: fixed server queries, no model tokens */
+document.querySelectorAll('.ql[data-env]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const src = btn.dataset.env;
+    const title = src === 'lab' ? 'Lab RH & temperature' : 'MMTS temperatures';
+    addMsg('bot', `<figure class="img-card">
+      <a href="/api/env_plot?source=${src}&hours=6" target="_blank">
+      <img class="big" src="/api/env_plot?source=${src}&hours=6&ts=${Date.now()}"
+           alt="${title}"></a>
+      <figcaption>${title} — past 6 hours, live from the database ·
+      click the chip again to refresh</figcaption></figure>`);
+  });
+});
+
+document.getElementById('qlProd').addEventListener('click', async () => {
+  const bubble = addMsg('bot',
+    '<div class="typing"><span></span><span></span><span></span></div>');
+  try {
+    const d = await (await fetch('/api/production')).json();
+    const total = d.rows.reduce((s, r) => s + Number(r[1]), 0);
+    bubble.innerHTML = tableHtml({columns: d.columns, rows: d.rows,
+                                  truncated: false}) +
+      `<div class="caption"><p><b>Module production by type and final grade</b>
+       (latest grading run per module, ${total} modules) — "no grade" has a QC
+       row with NULL grade; "ungraded" has no QC row.</p></div>`;
+  } catch (err) {
+    bubble.innerHTML = `<div class="notice">Failed: ${esc(String(err))}</div>`;
+  }
+  bubble.scrollIntoView({behavior: 'smooth', block: 'end'});
+});
 
 send.addEventListener('click', ask);
 input.addEventListener('keydown', e => {
