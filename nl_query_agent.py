@@ -150,7 +150,21 @@ READOUT GRADE thresholds:
 - A: fraction of bad cells < 2%
 - B: fraction of bad cells < 8%
 - C: fraction of bad cells >= 8%
-- F: fraction of dead cells >= 8% or >33 dead cells"""
+- F: fraction of dead cells >= 8% or >33 dead cells
+
+COMPLETENESS EXPECTATIONS (for "is everything there?" checks):
+- module_qc_summary is the grading record: a fully graded module has non-NULL final_grade, \
+proto_grade, module_grade, iv_grade and readout_grade, plus a grade_timestamp. \
+(final_grade_reason is routinely empty in practice — do not report that as a gap.) \
+A module with no module_qc_summary row has not been graded at all.
+- Each subgrade has an upstream source: proto_grade <- proto_inspect, module_grade <- \
+module_inspect, iv_grade <- module_iv_test, readout_grade <- module_pedestal_test (+ \
+module_ileak_estimate). A missing subgrade usually traces to missing/NULL upstream rows.
+- module_info's workflow date columns (assembled, inspected, wb_front, wb_back, encap_front, \
+encap_back, test_iv, test_ped) show how far a module has progressed; NULL means that step is \
+not recorded, so downstream data is expected to be absent too.
+- A module normally references its parts via hxb_name, bp_name, sen_name, proto_name in \
+module_info; NULLs there mean broken lineage to the part tables."""
 
 # ----------------------------------------
 # Credential handling (same precedence as existing tools)
@@ -553,8 +567,15 @@ Your final reply should be a brief summary or direct answer (counts, highlights,
 not a restatement of every row.
 - Flag bad or unusual values you notice in results (out-of-family numbers, unexpected NULLs, \
 inconsistent grades/statuses, array summaries reporting outliers) by labeling them "outlier" \
-in your answer — but do NOT diagnose, interpret, or speculate about causes; just identify \
-which part/value is the outlier. Leave interpretation to the user.
+in your answer — but do NOT speculate about physical or hardware causes; just identify \
+which part/value is the outlier. Leave physical interpretation to the user.
+- Data COMPLETENESS assessment is allowed and encouraged: when asked what is missing, why a \
+value is absent, or whether entries are complete (especially grades), trace the gap through \
+the database itself — e.g. a NULL iv_grade in module_qc_summary alongside no module_iv_test \
+rows for that module means the grade is missing because no IV test is recorded. Use \
+LEFT JOIN / NOT EXISTS / IS NULL queries to find parts missing expected records or fields, \
+and report which upstream data is absent. Stating data lineage ("missing because table X has \
+no row / column Y is NULL") is not speculation; guessing why the measurement never happened is.
 - If a question is ambiguous, make the most reasonable assumption, state it, and query.
 - If asked to modify data, explain that this agent is read-only and refer the user to the \
 database maintainers.
