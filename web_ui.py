@@ -195,7 +195,8 @@ def _render_env_png(source, rows, hours, part_rows=None):
         suptitle = f"Lab environment — past {hours} h"
     else:
         panels = [("Temperature (°C)", "temperature_C"),
-                  ("Dew point (°C)", "dewpoint_C")]
+                  ("Dew point (°C)", "dewpoint_C"),
+                  ("System status", "system_C")]
         key = "dev"
         suptitle = f"MMTS environment — past {hours} h"
 
@@ -216,10 +217,15 @@ def _render_env_png(source, rows, hours, part_rows=None):
             if val is None:
                 continue
             groups.setdefault(r[key], []).append((r["t"], float(val)))
+        is_status = sel == "system_C"
         for name in sorted(groups):
             pts = groups[name]
             ax.plot([p[0] for p in pts], [p[1] for p in pts],
-                    linewidth=1.2, label=name)
+                    linewidth=1.2, label=name,
+                    drawstyle="steps-post" if is_status else "default")
+        if is_status:
+            ax.set_ylim(-0.3, 5.5)
+            ax.set_yticks(range(6))
         ax.set_ylabel(label, fontsize=15)
         ax.grid(alpha=0.25)
         ax.xaxis.set_major_locator(locator)
@@ -289,7 +295,7 @@ async def api_env_plot(request):
             SELECT date_trunc('minute', log_timestamp) AS t,
                    device_name AS dev, metric, avg(value) AS v
             FROM mmts_sensors_logging
-            WHERE metric IN ('temperature_C', 'dewpoint_C')
+            WHERE metric IN ('temperature_C', 'dewpoint_C', 'system_C')
               AND log_timestamp > now() - interval '{hours} hours'
             GROUP BY 1, 2, 3 ORDER BY 1;""")
     png = await asyncio.to_thread(_render_env_png, source, rows, hours,
