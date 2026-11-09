@@ -396,10 +396,18 @@ async function ask() {
     for (const ev of (data.events || [])) {
       if (ev.type === 'sql') html += `<pre>${esc(ev.sql)}</pre>`;
       else if (ev.type === 'table') html += tableHtml(ev);
-      else if (ev.type === 'image') html += `<figure class="img-card">
-        <a href="/plots/${esc(ev.file)}" target="_blank">
-        <img class="big" src="/plots/${esc(ev.file)}" alt="sketch"></a>
-        <figcaption>sketched from the database — quick look, not a publication plot</figcaption></figure>`;
+      else if (ev.type === 'image') {
+        if (ev.src) {
+          html += `<figure class="img-card">
+            <img src="${esc(ev.src)}" alt="" style="width:180px;border-radius:16px;display:block">
+          </figure>`;
+        } else {
+          html += `<figure class="img-card">
+            <a href="/plots/${esc(ev.file)}" target="_blank">
+            <img class="big" src="/plots/${esc(ev.file)}" alt="sketch"></a>
+            <figcaption>sketched from the database — quick look, not a publication plot</figcaption></figure>`;
+        }
+      }
       else if (ev.type === 'notice') html += `<div class="notice">${esc(ev.text)}</div>`;
     }
     if (data.answer) html += answerHtml(data.answer);

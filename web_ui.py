@@ -105,6 +105,19 @@ async def api_ask(request):
     if not question:
         return web.json_response({"error": "empty question"}, status=400)
 
+    # Easter egg: encouragement for the frustrated (no model tokens)
+    q_lower = question.lower()
+    if "frustrated" in q_lower and "useless" in q_lower:
+        return web.json_response({
+            "events": [{"type": "image", "src": "/assets/brave_cow.png"}],
+            "answer": ("勇敢牛马，不怕困难 — brave to the task, fearless of "
+                       "trouble. You're not useless. Take a breath; "
+                       "I'm right here when you're ready."),
+            "tokens": {"query": 0, "session": STATE["session_tokens"],
+                       "session_cap": base.SESSION_TOKEN_CAP,
+                       "query_cap": base.QUERY_TOKEN_CAP},
+        })
+
     async with LOCK:
         if STATE["session_tokens"] >= base.SESSION_TOKEN_CAP:
             return web.json_response({
@@ -325,6 +338,7 @@ def main():
     app.router.add_get("/api/production", api_production)
     os.makedirs(base.PLOTS_DIR, exist_ok=True)
     app.router.add_static("/plots/", base.PLOTS_DIR)
+    app.router.add_static("/assets/", os.path.join(HERE, "ui_assets"))
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     print(f"MAC-BOT George UI: http://localhost:{PORT}")
