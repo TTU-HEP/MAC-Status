@@ -213,7 +213,7 @@
     </div>
     <div class="quick">
       <button class="ql" data-env="lab">🌡 Lab RH/T</button>
-      <button class="ql" data-env="mmts">🌡 MMTS T</button>
+      <button class="ql" data-env="mmts">🌡 MMTS status</button>
       <button class="ql" id="qlProd">📊 Production summary</button>
     </div>
   </header>
@@ -430,7 +430,7 @@ document.querySelectorAll('.ql[data-env]').forEach(btn => {
   btn.addEventListener('click', () => {
     const src = btn.dataset.env;
     const title = src === 'lab' ? 'Lab RH, temperature & particle counts'
-                                : 'MMTS temperatures';
+                                : 'MMTS status';
     addMsg('bot', `<figure class="img-card">
       <a href="/api/env_plot?source=${src}&hours=6" target="_blank">
       <img class="big" src="/api/env_plot?source=${src}&hours=6&ts=${Date.now()}"
