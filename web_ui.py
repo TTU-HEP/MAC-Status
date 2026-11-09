@@ -106,8 +106,7 @@ async def api_ask(request):
         return web.json_response({"error": "empty question"}, status=400)
 
     # Easter egg: encouragement for the frustrated (no model tokens)
-    q_lower = question.lower()
-    if "frustrated" in q_lower and "useless" in q_lower:
+    if "useless" in question.lower():
         return web.json_response({
             "events": [{"type": "image", "src": "/assets/brave_cow.png"}],
             "answer": ("勇敢牛马，不怕困难 — brave to the task, fearless of "
