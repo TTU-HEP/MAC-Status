@@ -75,6 +75,27 @@ async def run_sql(args):
     return reply(base.rows_for_model(columns, display, truncated, shown=True))
 
 
+@tool("make_plot", base.MAKE_PLOT_TOOL["description"],
+      base.MAKE_PLOT_TOOL["input_schema"])
+async def make_plot(args):
+    def reply(text):
+        return {"content": [{"type": "text", "text": text}]}
+
+    try:
+        text, path = await base.run_plot_request(DB, args)
+    except ValueError as err:
+        STATE["events"].append({"type": "notice",
+                                "text": f"Plot rejected: {err}"})
+        return reply(f"Plot request rejected: {err}")
+    except Exception as err:
+        STATE["events"].append({"type": "notice",
+                                "text": f"Plot error: {err}"})
+        return reply(f"Plot error: {err}")
+    STATE["events"].append({"type": "image",
+                            "file": os.path.basename(path)})
+    return reply(text)
+
+
 async def api_ask(request):
     try:
         data = await request.json()
@@ -142,12 +163,12 @@ async def on_startup(app):
     DB = base.Database(base.resolve_db_password())
     schema_text = await DB.schema_text()
     server = create_sdk_mcp_server(name="macdb", version="1.0.0",
-                                   tools=[run_sql])
+                                   tools=[run_sql, make_plot])
     options = ClaudeAgentOptions(
         cli_path=find_claude_cli(),
         mcp_servers={"macdb": server},
         tools=[],
-        allowed_tools=["mcp__macdb__run_sql"],
+        allowed_tools=["mcp__macdb__run_sql", "mcp__macdb__make_plot"],
         disallowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep",
                           "WebFetch", "WebSearch", "NotebookEdit", "Task"],
         system_prompt=base.build_system_prompt(schema_text) + (

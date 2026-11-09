@@ -128,6 +128,15 @@
   }
   tr:nth-child(even) td { background:var(--code); }
   td img { max-height:150px; border-radius:10px; display:block; }
+  .img-card { margin:10px 0 4px; }
+  .img-card img.big {
+    width:100%; max-width:640px; border-radius:16px;
+    border:1px solid var(--border); display:block; background:#fff;
+  }
+  .img-card figcaption {
+    font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.6;
+  }
+  .img-card figcaption b { font-weight:600; color:var(--text); }
   .chip {
     background:var(--warn); color:var(--warn-text); border-radius:8px;
     padding:0 6px; font-weight:600;
@@ -310,7 +319,29 @@ function cellHtml(v) {
   return e.replace(/(\d+ outliers?)/g, '<span class="chip">$1</span>');
 }
 
+/* stored DB images: big image, remaining fields as small metadata */
+function imageCards(ev) {
+  return ev.rows.map(r => {
+    const imgs = [], metas = [];
+    r.forEach((v, i) => {
+      const e = esc(String(v ?? ''));
+      const m = e.match(IMG_RE);
+      if (m) {
+        imgs.push(`<a href="/plots/${m[1]}" target="_blank">
+          <img class="big" src="/plots/${m[1]}" alt="${m[1]}"></a>`);
+      } else if (String(v ?? '').trim()) {
+        metas.push(`<span><b>${esc(ev.columns[i])}</b> ${e}</span>`);
+      }
+    });
+    return `<figure class="img-card">${imgs.join('')}
+      <figcaption>${metas.join(' · ')}</figcaption></figure>`;
+  }).join('');
+}
+
 function tableHtml(ev) {
+  const hasImg = ev.rows.some(r =>
+    r.some(v => IMG_RE.test(esc(String(v ?? '')))));
+  if (hasImg) return imageCards(ev);
   const head = ev.columns.map(c => `<th>${esc(c)}</th>`).join('');
   const body = ev.rows.map(r =>
     `<tr>${r.map(v => `<td>${cellHtml(v)}</td>`).join('')}</tr>`).join('');
@@ -351,6 +382,10 @@ async function ask() {
     for (const ev of (data.events || [])) {
       if (ev.type === 'sql') html += `<pre>${esc(ev.sql)}</pre>`;
       else if (ev.type === 'table') html += tableHtml(ev);
+      else if (ev.type === 'image') html += `<figure class="img-card">
+        <a href="/plots/${esc(ev.file)}" target="_blank">
+        <img class="big" src="/plots/${esc(ev.file)}" alt="sketch"></a>
+        <figcaption>sketched from the database — quick look, not a publication plot</figcaption></figure>`;
       else if (ev.type === 'notice') html += `<div class="notice">${esc(ev.text)}</div>`;
     }
     if (data.answer) html += answerHtml(data.answer);

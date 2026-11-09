@@ -91,6 +91,24 @@ async def run_sql(args):
     return reply(base.rows_for_model(columns, display_rows, truncated, shown))
 
 
+@tool("make_plot", base.MAKE_PLOT_TOOL["description"],
+      base.MAKE_PLOT_TOOL["input_schema"])
+async def make_plot(args):
+    def reply(text):
+        return {"content": [{"type": "text", "text": text}]}
+
+    try:
+        text, path = await base.run_plot_request(DB, args)
+    except ValueError as err:
+        print(f"  [plot rejected] {err}")
+        return reply(f"Plot request rejected: {err}")
+    except Exception as err:
+        print(f"  [plot error] {err}")
+        return reply(f"Plot error: {err}")
+    print(f"Sketch saved: {os.path.relpath(path)}")
+    return reply(text)
+
+
 async def answer(client: ClaudeSDKClient, question: str) -> None:
     global SESSION_TOKENS
     if SESSION_TOKENS >= base.SESSION_TOKEN_CAP:
@@ -134,12 +152,13 @@ async def main():
     except Exception as err:
         sys.exit(f"Could not connect to the database: {err}")
 
-    server = create_sdk_mcp_server(name="macdb", version="1.0.0", tools=[run_sql])
+    server = create_sdk_mcp_server(name="macdb", version="1.0.0",
+                                   tools=[run_sql, make_plot])
     options = ClaudeAgentOptions(
         cli_path=cli_path,
         mcp_servers={"macdb": server},
         tools=[],  # no built-in tools: the database tool is all it gets
-        allowed_tools=["mcp__macdb__run_sql"],
+        allowed_tools=["mcp__macdb__run_sql", "mcp__macdb__make_plot"],
         disallowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep",
                           "WebFetch", "WebSearch", "NotebookEdit", "Task"],
         system_prompt=base.build_system_prompt(schema_text),

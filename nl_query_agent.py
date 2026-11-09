@@ -544,6 +544,119 @@ RUN_SQL_TOOL = {
 }
 
 
+MAKE_PLOT_TOOL = {
+    "name": "make_plot",
+    "description": (
+        "Sketch a quick plot from database data. Provide a read-only SELECT "
+        "that returns tidy columns (one row per point), then say which "
+        "columns to plot. The plot is rendered to a PNG and shown to the "
+        "user. Kinds: line, scatter, bar, hist."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "sql": {"type": "string",
+                    "description": "SELECT returning the data to plot."},
+            "kind": {"type": "string",
+                     "enum": ["line", "scatter", "bar", "hist"]},
+            "x": {"type": "string",
+                  "description": "x column (not needed for hist)."},
+            "y": {"type": "string",
+                  "description": "y column (values column for hist)."},
+            "series": {"type": "string",
+                       "description": "optional column to group into "
+                                      "one line/series per value."},
+            "title": {"type": "string"},
+            "xlabel": {"type": "string"},
+            "ylabel": {"type": "string"},
+            "logx": {"type": "boolean"},
+            "logy": {"type": "boolean"},
+            "bins": {"type": "integer", "description": "hist bins (default 30)"},
+        },
+        "required": ["sql", "kind", "y"],
+    },
+}
+
+
+def render_plot(columns, rows, spec) -> str:
+    """Render rows into a PNG sketch in agent_plots/; returns the path."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    kind = spec.get("kind")
+    x, y, series = spec.get("x"), spec.get("y"), spec.get("series")
+    for col, label in ((x, "x"), (y, "y"), (series, "series")):
+        if col and col not in columns:
+            raise ValueError(f"{label} column {col!r} is not in the query "
+                             f"result (columns: {', '.join(columns)})")
+    if kind != "hist" and not x:
+        raise ValueError("x column is required for line/scatter/bar plots")
+
+    def num(v):
+        return float(v) if isinstance(v, Decimal) else v
+
+    groups = {}
+    for r in rows:
+        groups.setdefault(str(r[series]) if series else "", []).append(r)
+
+    fig, ax = plt.subplots(figsize=(9, 5), layout="constrained")
+    for name, rs in sorted(groups.items()):
+        label = name or None
+        if kind == "hist":
+            vals = [num(r[y]) for r in rs if r[y] is not None]
+            ax.hist(vals, bins=int(spec.get("bins") or 30), alpha=0.65,
+                    label=label)
+            continue
+        pts = [(num(r[x]), num(r[y])) for r in rs
+               if r[x] is not None and r[y] is not None]
+        xs, ys = zip(*pts) if pts else ((), ())
+        if kind == "line":
+            ax.plot(xs, ys, marker="o", markersize=3, linewidth=1.3, label=label)
+        elif kind == "scatter":
+            ax.scatter(xs, ys, s=16, alpha=0.8, label=label)
+        elif kind == "bar":
+            ax.bar([str(v) for v in xs], ys, alpha=0.85, label=label)
+    if kind == "bar" and rows:
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", fontsize=8)
+    if spec.get("logx"):
+        ax.set_xscale("log")
+    if spec.get("logy"):
+        ax.set_yscale("log")
+    ax.set_title(spec.get("title") or "")
+    ax.set_xlabel(spec.get("xlabel") or x or "")
+    ax.set_ylabel(spec.get("ylabel") or y or "")
+    ax.grid(alpha=0.25)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        fig.legend(loc="outside right upper", fontsize="small", frameon=False,
+                   ncol=max(1, -(-len(labels) // 25)))
+
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(PLOTS_DIR, f"sketch_{stamp}.png")
+    n = 1
+    while os.path.exists(path):
+        n += 1
+        path = os.path.join(PLOTS_DIR, f"sketch_{stamp}_{n}.png")
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return path
+
+
+async def run_plot_request(db, spec):
+    """Validate + run the spec's SQL and render the sketch.
+    Returns (text_for_model, path)."""
+    cleaned = validate_sql(spec.get("sql", ""))  # raises ValueError
+    columns, rows, truncated = await db.run(cleaned)
+    if not rows:
+        raise ValueError("the query returned no rows, nothing to plot")
+    path = await asyncio.to_thread(render_plot, columns, rows, spec)
+    note = f" ({MAX_ROWS}-row cap hit; plot may be partial)" if truncated else ""
+    return (f"Sketch rendered from {len(rows)} rows{note} and shown to the "
+            f"user: {os.path.relpath(path)}"), path
+
+
 def build_system_prompt(schema_text: str) -> str:
     categories = "\n".join(
         f"- {cat}: {', '.join(tables)}" for cat, tables in CATEGORY_TABLES.items()
@@ -551,7 +664,8 @@ def build_system_prompt(schema_text: str) -> str:
     date_cols = "\n".join(f"- {t}: {c}" for t, c in TABLE_DATE_COLUMN.items())
     return f"""You are MAC-BOT George, the database query assistant for the TTU MAC (Module Assembly Center) lab, \
 part of the CMS HGCAL upgrade. You answer questions about hexaboards, baseplates, sensors, \
-protomodules, and assembled modules by querying a PostgreSQL database with the run_sql tool.
+protomodules, and assembled modules by querying a PostgreSQL database with the run_sql tool, \
+and you can sketch quick plots of the data with the make_plot tool.
 
 Rules:
 - READ ONLY. You can only run SELECT statements; the tool rejects everything else.
@@ -585,6 +699,12 @@ rows for that module means the grade is missing because no IV test is recorded. 
 LEFT JOIN / NOT EXISTS / IS NULL queries to find parts missing expected records or fields, \
 and report which upstream data is absent. Stating data lineage ("missing because table X has \
 no row / column Y is NULL") is not speculation; guessing why the measurement never happened is.
+- SKETCHING: when the user asks to plot/sketch/graph/visualize data (not a stored image), \
+use make_plot. Write a SELECT returning tidy columns, one row per point; expand parallel \
+array columns in the FROM clause, e.g. \
+FROM module_iv_test t, unnest(t.meas_v, t.meas_i) AS u(v, i). Use series to overlay parts \
+(e.g. module_name), logy for IV currents, hist for per-channel noise distributions. \
+Sketches are quick looks, not publication plots; mention that in one short clause.
 - If a question is ambiguous, make the most reasonable assumption, state it, and query.
 - If asked to modify data, explain that this agent is read-only and refer the user to the \
 database maintainers.
@@ -654,6 +774,21 @@ class Agent:
         )
         return rows_for_model(columns, display_rows, truncated, shown)
 
+    async def _handle_plot(self, tool_input) -> str:
+        try:
+            text, path = await run_plot_request(self.db, tool_input)
+        except ValueError as err:
+            print(f"  [plot rejected] {err}")
+            return f"Plot request rejected: {err}"
+        except (asyncpg.PostgresError, OSError) as err:
+            print(f"  [error] {err}")
+            return f"Database error: {err}"
+        except Exception as err:
+            print(f"  [plot error] {err}")
+            return f"Plot error: {err}"
+        print(f"Sketch saved: {os.path.relpath(path)}")
+        return text
+
     async def ask(self, question: str) -> str:
         if self.session_tokens >= SESSION_TOKEN_CAP:
             return (f"Session token cap reached ({self.session_tokens:,} of "
@@ -666,7 +801,7 @@ class Agent:
                 model=MODEL,
                 max_tokens=1500,
                 system=self.system,
-                tools=[RUN_SQL_TOOL],
+                tools=[RUN_SQL_TOOL, MAKE_PLOT_TOOL],
                 messages=self.messages,
             )
             step = count_usage_tokens(response.usage)
@@ -682,7 +817,10 @@ class Agent:
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    result_text = await self._handle_tool(block.input)
+                    if block.name == "make_plot":
+                        result_text = await self._handle_plot(block.input)
+                    else:
+                        result_text = await self._handle_tool(block.input)
                     tool_results.append(
                         {
                             "type": "tool_result",
