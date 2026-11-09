@@ -157,6 +157,13 @@ COMPLETENESS EXPECTATIONS (for "is everything there?" checks):
 proto_grade, module_grade, iv_grade and readout_grade, plus a grade_timestamp. \
 (final_grade_reason is routinely empty in practice — do not report that as a gap.) \
 A module with no module_qc_summary row has not been graded at all.
+- module_qc_summary holds one row per grading RUN, many per module (about 17 on average). \
+When reporting grades, ALWAYS use only the most recent row per module: \
+SELECT DISTINCT ON (module_no) ... ORDER BY module_no, grade_timestamp DESC NULLS LAST, \
+mod_qc_no DESC — including for counts and summaries (count modules on their latest row, \
+never raw rows). Show older grading runs only when the user explicitly asks for grading \
+history. Likewise prefer the latest test per module in module_iv_test / \
+module_pedestal_test unless history is requested.
 - Each subgrade has an upstream source: proto_grade <- proto_inspect, module_grade <- \
 module_inspect, iv_grade <- module_iv_test, readout_grade <- module_pedestal_test (+ \
 module_ileak_estimate). A missing subgrade usually traces to missing/NULL upstream rows.
