@@ -56,6 +56,21 @@ MODEL_ROW_SAMPLE = 50   # rows echoed back to the model for summarizing
 MAX_TOOL_TURNS = 8
 STATEMENT_TIMEOUT_MS = "30000"
 
+# Token accounting: caps on total tokens processed (input + cache + output)
+QUERY_TOKEN_CAP = int(os.getenv("MAC_AGENT_QUERY_TOKEN_CAP", "100000"))
+SESSION_TOKEN_CAP = int(os.getenv("MAC_AGENT_SESSION_TOKEN_CAP", "1000000"))
+
+
+def count_usage_tokens(usage) -> int:
+    """Total tokens processed in one API call (input + cache writes/reads +
+    output). Works on SDK usage objects and plain dicts."""
+    get = usage.get if isinstance(usage, dict) else lambda k: getattr(usage, k, 0)
+    return sum(
+        int(get(k) or 0)
+        for k in ("input_tokens", "cache_creation_input_tokens",
+                  "cache_read_input_tokens", "output_tokens")
+    )
+
 # Domain knowledge carried over from all_in_one.sh
 CATEGORY_TABLES = {
     "hexaboard": ["hexaboard", "hxb_pedestal_test", "hxb_inspect"],
@@ -85,6 +100,57 @@ TABLE_DATE_COLUMN = {
 }
 
 SEARCH_COLUMNS = ["module_name", "proto_name", "hxb_name", "bp_name", "sen_name"]
+
+# Official module grading scheme (backend reference knowledge)
+GRADING_SCHEME = """\
+FINAL GRADE: the lowest subgrade, EXCEPT if Proto Grade = B and all other subgrades are A, \
+then the final grade is still A. A manual override to grade F is possible (even when the \
+module cannot be graded automatically), in which case all subgrades are registered as F. \
+Installation grade is defined in the MAC GUI from the final grade: A/B -> 1, C -> 2, F -> 0.
+
+PROTO GRADE (sensor corners):
+- A: all sensor corners green
+- B: 1-3 yellow sensor corners and no red sensor corners
+- C: >3 yellow sensor corners and 0 red sensor corners
+- F: >0 red sensor corners
+
+MODULE GRADE (hexaboard corners):
+- A: all hexaboard corners green or purple
+- B: 1-3 yellow hexaboard corners and no red hexaboard corners
+- C: >3 yellow hexaboard corners and 0 red hexaboard corners
+- F: >0 red hexaboard corners
+
+IV GRADE (conditions: prefer T < -30C with no RH constraint, fall back to room \
+temperature with RH < 12%):
+- A: I(500V) < 100uA
+- B: I(500V) < 0.995mA
+- C: I(500V) >= 0.995mA and I(V_dep/2) < 10uA, where V_dep by sensor thickness is \
+{120um: 50V, 200um: 110V, 300um: 240V}
+- F: I(500V) >= 0.995mA and I(V_dep/2) >= 10uA (separates "early breakdown" from \
+"high current from beginning")
+
+READOUT GRADE bad-cell definitions:
+- Unbonded cells: new algorithm — for noise at pedestal runs with BV = [1, 10, 100]V, a \
+cell is unbonded if it passes two of: noise(BV1) < 1.2; noise(BV1)/noise(BV10) < 1.1; \
+noise(BV10)/noise(BV100) < 1.1. Fall back to: for the lowest-BV pedestal run, \
+noise < 1.7 (LD) / 1.4 (HD).
+- Dead cells: identically zero noise in pedestal runs at all BV — 1V, 10V, 100V, 300V, \
+500V/800V.
+- Noisy cells ("compromise definition", at the BV=500V pedestal run): HD 120um: noise < 3; \
+HD 200um: noise < 2.5; LD 200um: noise < 5; LD 300um: noise < 4. Threshold += 1 for all \
+partials; individual hot cells on all geometries increase the noisy threshold by += 1. \
+Two cells on HD Left and one cell on LD Bottom are masked for the noisy-cell calculation. \
+For NTU modules produced before 2026-01-21, fall back once to a 300V pedestal run, then \
+to any run with BV >= 100V.
+- Grounded cells: from the local DB.
+- High-Ileak cells: idac_scan estimates per-cell leakage current; a cell is bad if \
+Ileak > 30uA; an additional saturation check applies to cells with zero noise after \
+idac_scan.
+READOUT GRADE thresholds:
+- A: fraction of bad cells < 2%
+- B: fraction of bad cells < 8%
+- C: fraction of bad cells >= 8%
+- F: fraction of dead cells >= 8% or >33 dead cells"""
 
 # ----------------------------------------
 # Credential handling (same precedence as existing tools)
@@ -303,8 +369,8 @@ def _summarize_array(arr) -> str:
     ]
     if len(nums) == n:
         summary = (
-            f"{n} values: min={min(nums):g}, max={max(nums):g}, "
-            f"mean={statistics.fmean(nums):g}"
+            f"{n} values: min={min(nums):.4g}, max={max(nums):.4g}, "
+            f"mean={statistics.fmean(nums):.4g}"
         )
         n_out = _count_outliers(nums)
         if n_out:
@@ -496,6 +562,11 @@ Part categories and their tables:
 Primary date column per table (for 'recent', date ranges, sorting by time):
 {date_cols}
 
+Official grading scheme (use it to explain what grades mean or to check stored values \
+against definitions; stating that a value does or does not meet a definition is fine, but \
+still do not speculate about physical causes):
+{GRADING_SCHEME}
+
 Full schema (public):
 {schema_text}"""
 
@@ -512,6 +583,15 @@ class Agent:
             }
         ]
         self.messages = []
+        self.session_tokens = 0
+        self.last_query_tokens = 0
+
+    def usage_line(self) -> str:
+        line = (f"[tokens — this query: {self.last_query_tokens:,}; "
+                f"session: {self.session_tokens:,} / cap {SESSION_TOKEN_CAP:,}]")
+        if self.last_query_tokens >= QUERY_TOKEN_CAP:
+            line += " (per-query cap hit)"
+        return line
 
     async def _handle_tool(self, tool_input) -> str:
         sql = tool_input.get("sql", "")
@@ -532,6 +612,11 @@ class Agent:
         return rows_for_model(columns, display_rows, truncated, shown)
 
     async def ask(self, question: str) -> str:
+        if self.session_tokens >= SESSION_TOKEN_CAP:
+            return (f"Session token cap reached ({self.session_tokens:,} of "
+                    f"{SESSION_TOKEN_CAP:,}). Restart the agent, or raise "
+                    f"MAC_AGENT_SESSION_TOKEN_CAP.")
+        self.last_query_tokens = 0
         self.messages.append({"role": "user", "content": question})
         for _ in range(MAX_TOOL_TURNS):
             response = self.client.messages.create(
@@ -541,6 +626,9 @@ class Agent:
                 tools=[RUN_SQL_TOOL],
                 messages=self.messages,
             )
+            step = count_usage_tokens(response.usage)
+            self.last_query_tokens += step
+            self.session_tokens += step
             self.messages.append(
                 {"role": "assistant", "content": response.content}
             )
@@ -560,6 +648,14 @@ class Agent:
                         }
                     )
             self.messages.append({"role": "user", "content": tool_results})
+            if self.last_query_tokens >= QUERY_TOKEN_CAP:
+                return (f"Stopped: per-query token cap reached "
+                        f"({self.last_query_tokens:,} of {QUERY_TOKEN_CAP:,} "
+                        f"tokens). Try a narrower question, or raise "
+                        f"MAC_AGENT_QUERY_TOKEN_CAP.")
+            if self.session_tokens >= SESSION_TOKEN_CAP:
+                return (f"Stopped: session token cap reached "
+                        f"({self.session_tokens:,} of {SESSION_TOKEN_CAP:,}).")
         return "Stopped: too many query attempts for one question."
 
 
@@ -588,7 +684,7 @@ async def main():
     if len(sys.argv) > 1:
         question = " ".join(sys.argv[1:])
         answer = await agent.ask(question)
-        print(f"\n{answer}")
+        print(f"\n{answer}\n{agent.usage_line()}")
         return
 
     print("---------------------------------------------")
@@ -612,7 +708,7 @@ async def main():
         except anthropic.APIError as err:
             print(f"API error: {err}")
             continue
-        print(f"\n{answer}")
+        print(f"\n{answer}\n{agent.usage_line()}")
 
 
 if __name__ == "__main__":
