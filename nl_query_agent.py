@@ -582,12 +582,37 @@ MAKE_PLOT_TOOL = {
 }
 
 
+def apply_hep_style(plt):
+    """Apply the CMS/HEP plotting style (mplhep). Returns the mplhep module,
+    or None when it is not installed (default matplotlib style stays)."""
+    try:
+        import mplhep as hep
+    except ImportError:
+        return None
+    plt.style.use(hep.style.CMS)
+    return hep
+
+
+def cms_label(ax, text="Internal", rlabel="TTU MAC"):
+    """CMS-style experiment label, placed manually so it stays put under
+    constrained layout (mplhep's own label drifts there)."""
+    ax.text(0, 1.012, "CMS", transform=ax.transAxes, ha="left", va="bottom",
+            fontweight="bold", fontsize=20)
+    ax.annotate(text, xy=(0, 1.012), xycoords="axes fraction",
+                xytext=(52, 0), textcoords="offset points",
+                va="bottom", fontstyle="italic", fontsize=15)
+    if rlabel:
+        ax.text(1, 1.012, rlabel, transform=ax.transAxes, ha="right",
+                va="bottom", fontsize=15)
+
+
 def render_plot(columns, rows, spec) -> str:
     """Render rows into a PNG sketch in agent_plots/; returns the path."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    hep = apply_hep_style(plt)
     kind = spec.get("kind")
     x, y, series = spec.get("x"), spec.get("y"), spec.get("series")
     for col, label in ((x, "x"), (y, "y"), (series, "series")):
@@ -604,21 +629,21 @@ def render_plot(columns, rows, spec) -> str:
     for r in rows:
         groups.setdefault(str(r[series]) if series else "", []).append(r)
 
-    fig, ax = plt.subplots(figsize=(9, 5), layout="constrained")
+    fig, ax = plt.subplots(figsize=(10, 7), layout="constrained")
     for name, rs in sorted(groups.items()):
         label = name or None
         if kind == "hist":
             vals = [num(r[y]) for r in rs if r[y] is not None]
             ax.hist(vals, bins=int(spec.get("bins") or 30), alpha=0.65,
-                    label=label)
+                    histtype="stepfilled", label=label)
             continue
         pts = [(num(r[x]), num(r[y])) for r in rs
                if r[x] is not None and r[y] is not None]
         xs, ys = zip(*pts) if pts else ((), ())
         if kind == "line":
-            ax.plot(xs, ys, marker="o", markersize=3, linewidth=1.3, label=label)
+            ax.plot(xs, ys, marker="o", markersize=5, linewidth=2, label=label)
         elif kind == "scatter":
-            ax.scatter(xs, ys, s=16, alpha=0.8, label=label)
+            ax.scatter(xs, ys, s=36, alpha=0.8, label=label)
         elif kind == "bar":
             ax.bar([str(v) for v in xs], ys, alpha=0.85, label=label)
     if kind == "bar" and rows:
@@ -631,13 +656,18 @@ def render_plot(columns, rows, spec) -> str:
         ax.set_xlim(spec.get("xmin"), spec.get("xmax"))
     if spec.get("ymin") is not None or spec.get("ymax") is not None:
         ax.set_ylim(spec.get("ymin"), spec.get("ymax"))
-    ax.set_title(spec.get("title") or "")
+    if hep:
+        cms_label(ax)
+        if spec.get("title"):
+            fig.suptitle(spec["title"], fontsize=15)
+    else:
+        ax.set_title(spec.get("title") or "")
     ax.set_xlabel(spec.get("xlabel") or x or "")
     ax.set_ylabel(spec.get("ylabel") or y or "")
     ax.grid(alpha=0.25)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        fig.legend(loc="outside right upper", fontsize="small", frameon=False,
+        fig.legend(loc="outside right upper", fontsize=13, frameon=False,
                    ncol=max(1, -(-len(labels) // 25)))
 
     os.makedirs(PLOTS_DIR, exist_ok=True)

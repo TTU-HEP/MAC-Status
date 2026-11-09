@@ -9,6 +9,27 @@ import sys
 import os
 import getpass
 
+# CMS/HEP plotting style
+try:
+    import mplhep as _hep
+    plt.style.use(_hep.style.CMS)
+except ImportError:
+    _hep = None
+
+
+def cms_label(ax, text="Internal", rlabel="TTU MAC"):
+    """CMS experiment label (manual placement, stable under constrained layout)."""
+    if _hep is None:
+        return
+    ax.text(0, 1.012, "CMS", transform=ax.transAxes, ha="left", va="bottom",
+            fontweight="bold", fontsize=20)
+    ax.annotate(text, xy=(0, 1.012), xycoords="axes fraction",
+                xytext=(52, 0), textcoords="offset points",
+                va="bottom", fontstyle="italic", fontsize=15)
+    if rlabel:
+        ax.text(1, 1.012, rlabel, transform=ax.transAxes, ha="right",
+                va="bottom", fontsize=15)
+
 # ----------------------------------------
 # Load configuration
 # ----------------------------------------
@@ -133,7 +154,7 @@ def finish_legend(fig, ax):
 
 
 def plot_iv_summary(modules, v_info, i_info, label):
-    fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
+    fig, ax = plt.subplots(figsize=(10, 7), layout='constrained')
     for m in modules:
         if v_info[m] and i_info[m]:
             ax.plot(v_info[m], i_info[m], label=m)
@@ -143,14 +164,15 @@ def plot_iv_summary(modules, v_info, i_info, label):
     ax.set_ylim(1e-8, 1e-5)
     ax.set_xlabel('V')
     ax.set_ylabel('I [A]')
-    ax.set_title(f'IV Summary ({label})')
+    fig.suptitle(f'IV Summary ({label})', fontsize=15)
+    cms_label(ax)
     finish_legend(fig, ax)
     plt.show(block=False)
     return fig                    # ← was missing
 
 
 def plot_adc_hist(modules, data, title, xlabel, xlim):
-    fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
+    fig, ax = plt.subplots(figsize=(10, 7), layout='constrained')
     for m in modules:
         if data[m]:
             ax.hist(data[m], bins=20, alpha=0.6, label=m)
@@ -158,7 +180,8 @@ def plot_adc_hist(modules, data, title, xlabel, xlim):
     ax.set_xlim(*xlim)
     ax.set_xlabel(xlabel)
     ax.set_ylabel('Frequency')
-    ax.set_title(title)
+    fig.suptitle(title, fontsize=15)
+    cms_label(ax)
     finish_legend(fig, ax)
     plt.show(block=False)
     return fig                    # ← was missing

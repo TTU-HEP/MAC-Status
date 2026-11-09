@@ -429,7 +429,8 @@ async function ask() {
 document.querySelectorAll('.ql[data-env]').forEach(btn => {
   btn.addEventListener('click', () => {
     const src = btn.dataset.env;
-    const title = src === 'lab' ? 'Lab RH & temperature' : 'MMTS temperatures';
+    const title = src === 'lab' ? 'Lab RH, temperature & particle counts'
+                                : 'MMTS temperatures';
     addMsg('bot', `<figure class="img-card">
       <a href="/api/env_plot?source=${src}&hours=6" target="_blank">
       <img class="big" src="/api/env_plot?source=${src}&hours=6&ts=${Date.now()}"

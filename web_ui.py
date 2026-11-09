@@ -180,12 +180,14 @@ async def _fetch_all(sql, *args):
         await conn.close()
 
 
-def _render_env_png(source, rows, hours):
+def _render_env_png(source, rows, hours, part_rows=None):
     import io
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib import dates as mdates
+
+    hep = base.apply_hep_style(plt)
 
     if source == "lab":
         panels = [("Temperature (°C)", "temp"), ("Relative humidity (%)", "rh")]
@@ -197,8 +199,9 @@ def _render_env_png(source, rows, hours):
         key = "dev"
         suptitle = f"MMTS environment — past {hours} h"
 
-    fig, axes = plt.subplots(len(panels), 1, figsize=(9, 6), sharex=True,
-                             layout="constrained")
+    n_panels = len(panels) + (1 if part_rows is not None else 0)
+    fig, axes = plt.subplots(n_panels, 1, figsize=(10, 3.8 * n_panels),
+                             sharex=True, layout="constrained")
     locator = mdates.AutoDateLocator()
     formatter = mdates.ConciseDateFormatter(locator)
     for ax, (label, sel) in zip(axes, panels):
@@ -217,18 +220,41 @@ def _render_env_png(source, rows, hours):
             pts = groups[name]
             ax.plot([p[0] for p in pts], [p[1] for p in pts],
                     linewidth=1.2, label=name)
-        ax.set_ylabel(label, fontsize=9)
+        ax.set_ylabel(label, fontsize=15)
         ax.grid(alpha=0.25)
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
         handles, labels = ax.get_legend_handles_labels()
         if handles:
-            ax.legend(fontsize=7, frameon=False, loc="upper left",
+            ax.legend(fontsize=11, frameon=False, loc="upper left",
                       ncol=max(1, len(labels) // 6))
         if not groups:
             ax.text(0.5, 0.5, "no data in window", transform=ax.transAxes,
                     ha="center", color="#999")
-    fig.suptitle(suptitle, fontsize=11)
+
+    if part_rows is not None:
+        ax = axes[-1]
+        locs = sorted({r["loc"] for r in part_rows})
+        channels = [("p500", "≥0.5 µm"), ("p1000", "≥1 µm"), ("p5000", "≥5 µm")]
+        for loc in locs:
+            pts = [r for r in part_rows if r["loc"] == loc]
+            for col, label in channels:
+                name = f"{label} · {loc}" if len(locs) > 1 else label
+                ax.plot([r["t"] for r in pts],
+                        [r[col] for r in pts],
+                        marker="o", markersize=3.5, linewidth=1.2, label=name)
+        ax.set_ylabel("Particles (per m³)", fontsize=15)
+        ax.grid(alpha=0.25)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        if part_rows:
+            ax.legend(fontsize=11, frameon=False, loc="upper left", ncol=3)
+        else:
+            ax.text(0.5, 0.5, "no particle data in window",
+                    transform=ax.transAxes, ha="center", color="#999")
+    if hep:
+        base.cms_label(axes[0])
+    fig.suptitle(suptitle, fontsize=16)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=110)
     plt.close(fig)
@@ -238,6 +264,7 @@ def _render_env_png(source, rows, hours):
 async def api_env_plot(request):
     source = request.query.get("source", "lab")
     hours = min(max(int(request.query.get("hours", "6")), 1), 48)
+    part_rows = None
     if source == "lab":
         rows = await _fetch_all(f"""
             SELECT date_trunc('minute', log_timestamp) AS t,
@@ -246,6 +273,14 @@ async def api_env_plot(request):
             FROM temp_humidity
             WHERE log_timestamp > now() - interval '{hours} hours'
             GROUP BY 1, 2 ORDER BY 1;""")
+        part_rows = await _fetch_all(f"""
+            SELECT log_timestamp AS t, log_location AS loc,
+                   prtcls_per_cubic_m_500nm AS p500,
+                   prtcls_per_cubic_m_1um AS p1000,
+                   prtcls_per_cubic_m_5um AS p5000
+            FROM particulate_counts
+            WHERE log_timestamp > now() - interval '{hours} hours'
+            ORDER BY 1;""")
     else:
         source = "mmts"
         rows = await _fetch_all(f"""
@@ -255,7 +290,8 @@ async def api_env_plot(request):
             WHERE metric IN ('temperature_C', 'dewpoint_C')
               AND log_timestamp > now() - interval '{hours} hours'
             GROUP BY 1, 2, 3 ORDER BY 1;""")
-    png = await asyncio.to_thread(_render_env_png, source, rows, hours)
+    png = await asyncio.to_thread(_render_env_png, source, rows, hours,
+                                  part_rows)
     return web.Response(body=png, content_type="image/png",
                         headers={"Cache-Control": "no-store"})
 

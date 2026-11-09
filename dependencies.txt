@@ -13,3 +13,4 @@ anthropic>=0.40.0
 # Local-credentials agent and web UI (nl_query_agent_local.py, web_ui.py)
 claude-agent-sdk>=0.2.0
 aiohttp>=3.9.0
+mplhep>=1.3.0
