@@ -6,3 +6,6 @@ PyYAML>=6.0
 
 # Plotting
 matplotlib>=3.7.0
+
+# Natural-language query agent (nl_query_agent.py)
+anthropic>=0.40.0

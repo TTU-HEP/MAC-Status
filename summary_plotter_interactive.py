@@ -112,15 +112,28 @@ async def fetch_latest_measurements(conn, module_names):
         i_info[name]   = [float(x) for x in i['meas_i']]     if i    else []
         adc_stdd[name] = [float(x) for x in std['adc_stdd']] if std  else []
         adc_mean[name] = [float(x) for x in mean['adc_mean']]if mean else []
-        print("vinfo = ", v_info)
-        print("iinfo = ", i_info)
     return v_info, i_info, adc_stdd, adc_mean
 
 # ----------------------------------------
 # Plotting  (each function now returns fig)
 # ----------------------------------------
+def finish_legend(fig, ax):
+    """Place the legend outside the axes so it never overlaps the data.
+    Splits into extra columns when there are many entries."""
+    handles, labels = ax.get_legend_handles_labels()
+    if not handles:
+        return
+    ncol = max(1, -(-len(labels) // 25))   # new column every 25 entries
+    fig.legend(
+        loc='outside right upper',
+        fontsize='small',
+        frameon=False,
+        ncol=ncol,
+    )
+
+
 def plot_iv_summary(modules, v_info, i_info, label):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
     for m in modules:
         if v_info[m] and i_info[m]:
             ax.plot(v_info[m], i_info[m], label=m)
@@ -130,13 +143,13 @@ def plot_iv_summary(modules, v_info, i_info, label):
     ax.set_xlabel('V')
     ax.set_ylabel('I [A]')
     ax.set_title(f'IV Summary ({label})')
-    ax.legend(fontsize='small')
+    finish_legend(fig, ax)
     plt.show(block=False)
     return fig                    # ← was missing
 
 
 def plot_adc_hist(modules, data, title, xlabel, xlim):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
     for m in modules:
         if data[m]:
             ax.hist(data[m], bins=20, alpha=0.6, label=m)
@@ -145,7 +158,7 @@ def plot_adc_hist(modules, data, title, xlabel, xlim):
     ax.set_xlabel(xlabel)
     ax.set_ylabel('Frequency')
     ax.set_title(title)
-    ax.legend(fontsize='small')
+    finish_legend(fig, ax)
     plt.show(block=False)
     return fig                    # ← was missing
 
@@ -217,8 +230,6 @@ How would you like to select modules?
         v_info, i_info, adc_stdd, adc_mean = await fetch_latest_measurements(
             conn, modules
         )
-        print("vinfo = ", v_info)
-        print("iinfo = ", i_info)
 
         safe_label = label.replace(' ', '_').replace('→', 'to')
 

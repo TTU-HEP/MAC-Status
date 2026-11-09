@@ -91,8 +91,23 @@ async def fetch_thickness_by_proto(conn, proto_names):
 # ----------------------------------------
 # Plotting
 # ----------------------------------------
+def finish_legend(fig, ax):
+    """Place the legend outside the axes so it never overlaps the data.
+    Splits into extra columns when there are many entries."""
+    handles, labels = ax.get_legend_handles_labels()
+    if not handles:
+        return
+    ncol = max(1, -(-len(labels) // 25))   # new column every 25 entries
+    fig.legend(
+        loc='outside right upper',
+        fontsize='small',
+        frameon=False,
+        ncol=ncol,
+    )
+
+
 def plot_thickness_distribution(thickness, title):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(9, 5), layout='constrained')
 
     for proto, values in thickness.items():
         if values:
@@ -107,8 +122,8 @@ def plot_thickness_distribution(thickness, title):
     ax.set_xlabel("Average Thickness")
     ax.set_ylabel("Frequency")
     ax.set_title(title)
-    ax.legend(fontsize='small')
-    plt.show()
+    finish_legend(fig, ax)
+    plt.show(block=False)
 
     return fig
 
@@ -124,7 +139,7 @@ def plot_combined_distribution(thickness, title):
     ax.set_xlabel("Average Thickness")
     ax.set_ylabel("Frequency")
     ax.set_title(title)
-    plt.show()
+    plt.show(block=False)
 
     return fig
 
