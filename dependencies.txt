@@ -9,3 +9,7 @@ matplotlib>=3.7.0
 
 # Natural-language query agent (nl_query_agent.py)
 anthropic>=0.40.0
+
+# Local-credentials agent and web UI (nl_query_agent_local.py, web_ui.py)
+claude-agent-sdk>=0.2.0
+aiohttp>=3.9.0

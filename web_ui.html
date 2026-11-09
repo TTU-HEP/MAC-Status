@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAC Database Agent</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+
+  body[data-theme="lavender"] {
+    --bg:#f4f1fb; --panel:#ffffff; --bubble-user:#e5ddf8; --bubble-bot:#ffffff;
+    --accent:#8b7ec8; --accent-soft:#d9d1f2; --text:#3a3550; --muted:#8d87a6;
+    --border:#e6e0f4; --code:#f1edfa; --warn:#f6e3ef; --warn-text:#a05a8c;
+  }
+  body[data-theme="mint"] {
+    --bg:#eef7f1; --panel:#ffffff; --bubble-user:#d8eee1; --bubble-bot:#ffffff;
+    --accent:#5fae8d; --accent-soft:#c4e5d5; --text:#2f473c; --muted:#7fa191;
+    --border:#ddeee4; --code:#ecf6f0; --warn:#fdf0dc; --warn-text:#a8793a;
+  }
+  body[data-theme="peach"] {
+    --bg:#fdf3ed; --panel:#ffffff; --bubble-user:#fbe1d1; --bubble-bot:#ffffff;
+    --accent:#e08e66; --accent-soft:#f6d3bf; --text:#4f3a30; --muted:#ab8d7d;
+    --border:#f4e2d7; --code:#faf0e9; --warn:#f0e4f6; --warn-text:#8a64a8;
+  }
+  body[data-theme="sky"] {
+    --bg:#eff5fa; --panel:#ffffff; --bubble-user:#dceafa; --bubble-bot:#ffffff;
+    --accent:#6f9fc8; --accent-soft:#c6dcf0; --text:#32445a; --muted:#8299ad;
+    --border:#dfeaf4; --code:#edf4fa; --warn:#fcebe6; --warn-text:#b0604a;
+  }
+
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    transition: background .3s;
+  }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 0 16px 130px; }
+
+  header {
+    position: sticky; top:0; z-index:5; background:var(--bg);
+    padding:14px 0 10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .brand { display:flex; align-items:center; gap:10px; flex:1; min-width:220px; }
+  .logo {
+    width:38px; height:38px; border-radius:14px; background:var(--accent-soft);
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+    color:var(--accent);
+  }
+  .brand h1 { font-size:16px; margin:0; font-weight:650; }
+  .brand p  { font-size:12px; margin:0; color:var(--muted); }
+
+  .themes { display:flex; gap:6px; align-items:center; }
+  .theme-pill {
+    width:26px; height:26px; border-radius:50%; border:2px solid transparent;
+    cursor:pointer; padding:0; outline-offset:2px;
+  }
+  .theme-pill.active { border-color: var(--accent); }
+  .tp-lavender { background:linear-gradient(135deg,#e5ddf8,#8b7ec8); }
+  .tp-mint     { background:linear-gradient(135deg,#d8eee1,#5fae8d); }
+  .tp-peach    { background:linear-gradient(135deg,#fbe1d1,#e08e66); }
+  .tp-sky      { background:linear-gradient(135deg,#dceafa,#6f9fc8); }
+
+  .toggle {
+    display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted);
+    cursor:pointer; user-select:none;
+  }
+  .toggle input { accent-color: var(--accent); }
+
+  .chat { display:flex; flex-direction:column; gap:18px; padding-top:14px; }
+
+  .msg { display:flex; gap:10px; max-width:100%; }
+  .msg.user { justify-content:flex-end; }
+  .avatar {
+    width:32px; height:32px; border-radius:12px; flex:0 0 32px; margin-top:2px;
+    background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .bubble {
+    padding:12px 16px; border-radius:20px; max-width:85%;
+    box-shadow:0 1px 3px rgba(60,50,90,.06);
+    overflow-wrap:break-word;
+  }
+  .user .bubble { background:var(--bubble-user); border-bottom-right-radius:8px; }
+  .bot  .bubble {
+    background:var(--bubble-bot); border:1px solid var(--border);
+    border-bottom-left-radius:8px; max-width:calc(100% - 42px);
+  }
+  .bubble p { margin:.35em 0; }
+  .bubble ul { margin:.35em 0; padding-left:20px; }
+  .bubble code {
+    background:var(--code); border-radius:6px; padding:1px 5px; font-size:13px;
+  }
+  .bubble pre {
+    background:var(--code); border-radius:14px; padding:10px 14px;
+    overflow-x:auto; font-size:13px;
+  }
+
+  .tokens { font-size:11px; color:var(--muted); margin-top:8px; }
+
+  details.table-box { margin:10px 0 4px; }
+  details.table-box summary {
+    cursor:pointer; font-size:12.5px; color:var(--accent); font-weight:600;
+    list-style:none; display:inline-flex; align-items:center; gap:6px;
+  }
+  details.table-box summary::before { content:"▸"; transition:transform .2s; }
+  details.table-box[open] summary::before { transform:rotate(90deg); }
+  .table-scroll {
+    overflow:auto; max-height:340px; margin-top:8px;
+    border:1px solid var(--border); border-radius:14px;
+  }
+  table { border-collapse:collapse; font-size:12.5px; min-width:100%; }
+  th, td { padding:7px 12px; text-align:left; white-space:nowrap; }
+  th {
+    position:sticky; top:0; background:var(--accent-soft); color:var(--text);
+    font-weight:650;
+  }
+  tr:nth-child(even) td { background:var(--code); }
+  td img { max-height:150px; border-radius:10px; display:block; }
+  .chip {
+    background:var(--warn); color:var(--warn-text); border-radius:8px;
+    padding:0 6px; font-weight:600;
+  }
+
+  .notice {
+    font-size:12.5px; color:var(--warn-text); background:var(--warn);
+    border-radius:12px; padding:6px 12px; margin:8px 0; display:inline-block;
+  }
+
+  .typing { display:inline-flex; gap:5px; padding:6px 2px; }
+  .typing span {
+    width:7px; height:7px; border-radius:50%; background:var(--accent);
+    opacity:.4; animation:blink 1.2s infinite;
+  }
+  .typing span:nth-child(2){ animation-delay:.2s; }
+  .typing span:nth-child(3){ animation-delay:.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.25; transform:translateY(0)}
+                     40%{opacity:1; transform:translateY(-3px)} }
+
+  .inputbar {
+    position:fixed; left:0; right:0; bottom:0; background:var(--bg);
+    padding:12px 16px 18px;
+  }
+  .inputbar .inner {
+    max-width:800px; margin:0 auto; display:flex; gap:10px; align-items:flex-end;
+    background:var(--panel); border:1px solid var(--border); border-radius:24px;
+    padding:8px 8px 8px 18px; box-shadow:0 4px 16px rgba(60,50,90,.07);
+  }
+  textarea {
+    flex:1; border:none; outline:none; resize:none; background:transparent;
+    color:var(--text); font:inherit; max-height:120px; padding:6px 0;
+  }
+  textarea::placeholder { color:var(--muted); }
+  #send {
+    width:38px; height:38px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--accent); color:#fff; font-size:17px; flex:0 0 38px;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .1s;
+  }
+  #send:disabled { opacity:.45; cursor:default; }
+  #send:not(:disabled):active { transform:scale(.92); }
+  .hint {
+    max-width:800px; margin:6px auto 0; font-size:11px; color:var(--muted);
+    text-align:center;
+  }
+</style>
+</head>
+<body data-theme="mint">
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">⬡</div>
+      <div>
+        <h1>MAC Database Agent</h1>
+        <p id="status">read-only · connecting…</p>
+      </div>
+    </div>
+    <label class="toggle"><input type="checkbox" id="showSql"> show SQL</label>
+    <div class="themes" title="Theme">
+      <button class="theme-pill tp-lavender" data-theme="lavender" aria-label="Lavender"></button>
+      <button class="theme-pill tp-mint active" data-theme="mint"  aria-label="Mint"></button>
+      <button class="theme-pill tp-peach"    data-theme="peach"    aria-label="Peach"></button>
+      <button class="theme-pill tp-sky"      data-theme="sky"      aria-label="Sky"></button>
+    </div>
+  </header>
+
+  <div class="chat" id="chat">
+    <div class="msg bot">
+      <div class="avatar">⬡</div>
+      <div class="bubble">
+        <p>Hi! I answer questions about the TTU MAC database — modules,
+        hexaboards, sensors, baseplates, protomodules, test results, grades
+        and plots. I'm <b>read-only</b>.</p>
+        <p style="color:var(--muted); font-size:13px">Try: <i>"modules assembled
+        last week"</i> · <i>"IV grade for 320MLF3WDTT0099"</i> ·
+        <i>"show the hexplot for the latest inspection"</i></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="inputbar">
+  <div class="inner">
+    <textarea id="q" rows="1" placeholder="Ask about the database…"></textarea>
+    <button id="send" aria-label="Send">➤</button>
+  </div>
+  <div class="hint">SELECT-only · results capped at 500 rows · unusual values flagged as outliers</div>
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('q');
+const send = document.getElementById('send');
+
+/* theme switching */
+document.querySelectorAll('.theme-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.body.dataset.theme = btn.dataset.theme;
+    document.querySelectorAll('.theme-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    try { localStorage.setItem('mac-theme', btn.dataset.theme); } catch(e) {}
+  });
+});
+try {
+  const saved = localStorage.getItem('mac-theme');
+  if (saved) document.querySelector(`.theme-pill[data-theme="${saved}"]`)?.click();
+} catch(e) {}
+
+fetch('/api/status').then(r => r.json()).then(s => {
+  document.getElementById('status').textContent =
+    `read-only · ${s.db} · ${s.model}`;
+}).catch(() => {
+  document.getElementById('status').textContent = 'read-only · server unreachable';
+});
+
+const esc = t => t.replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* tiny markdown: bold, code, bullets, pipe tables, paragraphs */
+const inlineFmt = s => s
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+function pipeTable(rows) {
+  const parse = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+  const cells = rows.map(parse).filter(r => !r.every(c => /^:?-{2,}:?$/.test(c)));
+  if (cells.length < 2) return rows.map(r => `<p>${inlineFmt(r)}</p>`).join('');
+  const head = `<tr>${cells[0].map(c => `<th>${inlineFmt(c)}</th>`).join('')}</tr>`;
+  const body = cells.slice(1).map(r =>
+    `<tr>${r.map(c => `<td>${inlineFmt(c)}</td>`).join('')}</tr>`).join('');
+  return `<div class="table-scroll" style="margin:8px 0"><table>
+    <thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+function md(text) {
+  const lines = esc(text).split('\n');
+  let html = '', inList = false, i = 0;
+  const flushList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flushList();
+      const tbl = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) tbl.push(lines[i++]);
+      html += pipeTable(tbl);
+      continue;
+    }
+    const fmt = inlineFmt(line);
+    if (/^\s*[-•]\s+/.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += '<li>' + fmt.replace(/^\s*[-•]\s+/, '') + '</li>';
+    } else {
+      flushList();
+      if (line.trim()) html += '<p>' + fmt + '</p>';
+    }
+    i++;
+  }
+  flushList();
+  return html;
+}
+
+const IMG_RE = /^&lt;\w+ image, [\d.]+ kB -&gt; \S*agent_plots\/([^&\s]+)&gt;$/;
+
+function cellHtml(v) {
+  const e = esc(String(v ?? ''));
+  const m = e.match(IMG_RE);
+  if (m) {
+    const file = m[1];
+    return `<a href="/plots/${file}" target="_blank"><img src="/plots/${file}" alt="${file}"></a>`;
+  }
+  return e.replace(/(\d+ outliers?)/g, '<span class="chip">$1</span>');
+}
+
+function tableHtml(ev) {
+  const head = ev.columns.map(c => `<th>${esc(c)}</th>`).join('');
+  const body = ev.rows.map(r =>
+    `<tr>${r.map(v => `<td>${cellHtml(v)}</td>`).join('')}</tr>`).join('');
+  const note = ev.truncated ? ' (capped at 500)' : '';
+  return `<details class="table-box"${ev.rows.length <= 12 ? ' open' : ''}>
+    <summary>results · ${ev.rows.length} row${ev.rows.length !== 1 ? 's' : ''}${note}</summary>
+    <div class="table-scroll"><table><thead><tr>${head}</tr></thead>
+    <tbody>${body}</tbody></table></div></details>`;
+}
+
+function addMsg(role, html) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = (role === 'bot' ? '<div class="avatar">⬡</div>' : '') +
+                  `<div class="bubble">${html}</div>`;
+  chat.appendChild(div);
+  div.scrollIntoView({behavior: 'smooth', block: 'end'});
+  return div.querySelector('.bubble');
+}
+
+async function ask() {
+  const question = input.value.trim();
+  if (!question || send.disabled) return;
+  input.value = ''; autosize();
+  addMsg('user', esc(question));
+  send.disabled = true;
+  const bubble = addMsg('bot',
+    '<div class="typing"><span></span><span></span><span></span></div>');
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question,
+        show_sql: document.getElementById('showSql').checked}),
+    });
+    const data = await res.json();
+    let html = '';
+    for (const ev of (data.events || [])) {
+      if (ev.type === 'sql') html += `<pre>${esc(ev.sql)}</pre>`;
+      else if (ev.type === 'table') html += tableHtml(ev);
+      else if (ev.type === 'notice') html += `<div class="notice">${esc(ev.text)}</div>`;
+    }
+    if (data.answer) html += md(data.answer);
+    if (data.error) html += `<div class="notice">${esc(data.error)}</div>`;
+    if (data.tokens && data.tokens.query) {
+      html += `<div class="tokens">tokens — this query: ${data.tokens.query.toLocaleString()} ·
+        session: ${data.tokens.session.toLocaleString()} / ${data.tokens.session_cap.toLocaleString()}</div>`;
+    }
+    bubble.innerHTML = html || '<div class="notice">No response.</div>';
+  } catch (err) {
+    bubble.innerHTML = `<div class="notice">Request failed: ${esc(String(err))}</div>`;
+  }
+  send.disabled = false;
+  bubble.scrollIntoView({behavior: 'smooth', block: 'end'});
+  input.focus();
+}
+
+send.addEventListener('click', ask);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }
+});
+function autosize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+}
+input.addEventListener('input', autosize);
+input.focus();
+</script>
+</body>
+</html>

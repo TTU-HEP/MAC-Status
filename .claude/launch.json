@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mac-agent-ui",
+      "runtimeExecutable": "./venv/bin/python3",
+      "runtimeArgs": ["web_ui.py"],
+      "port": 8765
+    }
+  ]
+}
