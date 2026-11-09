@@ -571,6 +571,10 @@ MAKE_PLOT_TOOL = {
             "ylabel": {"type": "string"},
             "logx": {"type": "boolean"},
             "logy": {"type": "boolean"},
+            "xmin": {"type": "number"},
+            "xmax": {"type": "number"},
+            "ymin": {"type": "number"},
+            "ymax": {"type": "number"},
             "bins": {"type": "integer", "description": "hist bins (default 30)"},
         },
         "required": ["sql", "kind", "y"],
@@ -623,6 +627,10 @@ def render_plot(columns, rows, spec) -> str:
         ax.set_xscale("log")
     if spec.get("logy"):
         ax.set_yscale("log")
+    if spec.get("xmin") is not None or spec.get("xmax") is not None:
+        ax.set_xlim(spec.get("xmin"), spec.get("xmax"))
+    if spec.get("ymin") is not None or spec.get("ymax") is not None:
+        ax.set_ylim(spec.get("ymin"), spec.get("ymax"))
     ax.set_title(spec.get("title") or "")
     ax.set_xlabel(spec.get("xlabel") or x or "")
     ax.set_ylabel(spec.get("ylabel") or y or "")
@@ -704,6 +712,8 @@ use make_plot. Write a SELECT returning tidy columns, one row per point; expand 
 array columns in the FROM clause, e.g. \
 FROM module_iv_test t, unnest(t.meas_v, t.meas_i) AS u(v, i). Use series to overlay parts \
 (e.g. module_name), logy for IV currents, hist for per-channel noise distributions. \
+IV curve sketches use the standard axes: logy with ymin=1e-8, ymax=1e-5 (current in A) and \
+xmin=0, xmax=800 (voltage in V), unless the user asks for different ranges. \
 Sketches are quick looks, not publication plots; mention that in one short clause.
 - If a question is ambiguous, make the most reasonable assumption, state it, and query.
 - If asked to modify data, explain that this agent is read-only and refer the user to the \

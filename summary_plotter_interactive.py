@@ -139,7 +139,8 @@ def plot_iv_summary(modules, v_info, i_info, label):
             ax.plot(v_info[m], i_info[m], label=m)
 
     ax.set_yscale('log')
-    ax.set_xlim(0, 850)
+    ax.set_xlim(0, 800)
+    ax.set_ylim(1e-8, 1e-5)
     ax.set_xlabel('V')
     ax.set_ylabel('I [A]')
     ax.set_title(f'IV Summary ({label})')
