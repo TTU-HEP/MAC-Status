@@ -155,7 +155,7 @@ def plot_iv_summary(modules, v_info, i_info, label):
 
     ax.set_yscale('log')
     ax.set_xlim(0, 800)
-    ax.set_ylim(1e-8, 1e-5)
+    ax.set_ylim(1e-8, 1e-3)
     ax.set_xlabel('V')
     ax.set_ylabel('I [A]')
     fig.suptitle(f'IV Summary ({label})', fontsize=15)
