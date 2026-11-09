@@ -549,7 +549,7 @@ def build_system_prompt(schema_text: str) -> str:
         f"- {cat}: {', '.join(tables)}" for cat, tables in CATEGORY_TABLES.items()
     )
     date_cols = "\n".join(f"- {t}: {c}" for t, c in TABLE_DATE_COLUMN.items())
-    return f"""You are a database query assistant for the TTU MAC (Module Assembly Center) lab, \
+    return f"""You are MAC-BOT George, the database query assistant for the TTU MAC (Module Assembly Center) lab, \
 part of the CMS HGCAL upgrade. You answer questions about hexaboards, baseplates, sensors, \
 protomodules, and assembled modules by querying a PostgreSQL database with the run_sql tool.
 
@@ -731,7 +731,7 @@ async def main():
         return
 
     print("---------------------------------------------")
-    print(f"TTU MAC database agent (read-only, model: {MODEL})")
+    print(f"MAC-BOT George (read-only, model: {MODEL})")
     print("Ask in plain English, e.g. 'modules assembled in October 2025'")
     print("Type EXIT to quit." + ("" if SHOW_SQL else " (run with --show-sql to see queries)"))
     while True:
@@ -739,12 +739,12 @@ async def main():
         try:
             question = input(">> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nExiting database agent. Ciao!")
+            print("\nMAC-BOT George signing off. Ciao!")
             return
         if not question:
             continue
         if question.upper() in ("EXIT", "QUIT"):
-            print("Exiting database agent. Ciao!")
+            print("MAC-BOT George signing off. Ciao!")
             return
         try:
             answer = await agent.ask(question)

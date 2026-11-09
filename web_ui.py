@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Web chat UI for the read-only TTU MAC database agent.
+Web chat UI for MAC-BOT George, the read-only TTU MAC database agent.
 
 Wraps the same agent as nl_query_agent_local.py (Claude Code login, no API
 key) behind a small local web server with a chat interface. All safety
@@ -183,7 +183,7 @@ def main():
     app.router.add_static("/plots/", base.PLOTS_DIR)
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
-    print(f"MAC database agent UI: http://localhost:{PORT}")
+    print(f"MAC-BOT George UI: http://localhost:{PORT}")
     web.run_app(app, host="127.0.0.1", port=PORT, print=None)
 
 

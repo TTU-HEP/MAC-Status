@@ -14,7 +14,7 @@ Tutorial for usage is linked here: https://eventreg.ads.ttu.edu/event/237/contri
 
 **Natural-language query agent**
 
-`nl_query_agent.py` is a read-only agent version of `all_in_one.sh`: ask questions in plain English and it translates them into validated SQL SELECT queries, runs them as the `viewer` user inside a READ ONLY transaction, prints the rows, and summarizes the answer. It cannot modify the database.
+`nl_query_agent.py` is MAC-BOT George, a read-only agent version of `all_in_one.sh`: ask questions in plain English and it translates them into validated SQL SELECT queries, runs them as the `viewer` user inside a READ ONLY transaction, prints the rows, and summarizes the answer. It cannot modify the database.
 
 Setup (inside the venv described below, after installing dependencies):
 
@@ -30,7 +30,7 @@ Each answer ends with a token-usage line, and usage is capped: 100k tokens per q
 
 **Web chat UI**
 
-`web_ui.py` serves the same read-only agent as a chat web page (standard LLM layout) at http://localhost:8765, using your Claude Code login:
+`web_ui.py` serves MAC-BOT George as a chat web page (standard LLM layout) at http://localhost:8765, using your Claude Code login:
 
 ```
 python3 web_ui.py
