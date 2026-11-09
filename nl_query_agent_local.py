@@ -83,7 +83,11 @@ async def run_sql(args):
         print(f"  [error] {err}")
         return reply(f"Database error: {err}")
     display_rows = base.materialize(columns, rows)
-    shown = base.print_results(columns, display_rows, truncated)
+    # print_results may wait on the user's confirmation for huge tables:
+    # run it in a thread so the SDK's event loop keeps pumping messages
+    shown = await asyncio.to_thread(
+        base.print_results, columns, display_rows, truncated
+    )
     return reply(base.rows_for_model(columns, display_rows, truncated, shown))
 
 

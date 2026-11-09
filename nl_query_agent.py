@@ -418,6 +418,7 @@ def _cell(value, width=64):
 
 # Ask before dumping huge tables to the terminal
 LARGE_PRINT_LINES = int(os.getenv("MAC_AGENT_PRINT_LIMIT", "500"))
+CONFIRM_TIMEOUT_S = float(os.getenv("MAC_AGENT_CONFIRM_TIMEOUT", "60"))
 
 
 def _confirm_large_print(n_rows, n_lines) -> bool:
@@ -427,18 +428,26 @@ def _confirm_large_print(n_rows, n_lines) -> bool:
         print(f"({n_rows} rows fetched; full output suppressed — would print "
               f"{n_lines}+ lines in non-interactive mode)")
         return False
+    print(
+        f"**WARNING: PRINTING {n_lines}+ LINES ({n_rows} rows). "
+        f"Press Enter to proceed, anything else to skip. Not recommended!** ",
+        end="", flush=True,
+    )
     try:
-        resp = input(
-            f"**WARNING: PRINTING {n_lines}+ LINES ({n_rows} rows). "
-            f"Press Enter to proceed, anything else to skip. Not recommended!** "
-        )
-    except (EOFError, KeyboardInterrupt):
+        import select
+        ready, _, _ = select.select([sys.stdin], [], [], CONFIRM_TIMEOUT_S)
+        if not ready:
+            print(f"\n(no answer in {CONFIRM_TIMEOUT_S:.0f}s — output "
+                  f"skipped: {n_rows} rows)")
+            return False
+        resp = sys.stdin.readline()
+        if resp == "" or resp.strip():  # EOF or any text: skip
+            print(f"(output skipped: {n_rows} rows)")
+            return False
+        return True
+    except (OSError, ValueError, KeyboardInterrupt):
         print(f"\n(output skipped: {n_rows} rows)")
         return False
-    if resp.strip():
-        print(f"(output skipped: {n_rows} rows)")
-        return False
-    return True
 
 
 def print_results(columns, rows, truncated):
@@ -608,7 +617,11 @@ class Agent:
             print(f"  [error] {err}")
             return f"Database error: {err}"
         display_rows = materialize(columns, rows)
-        shown = print_results(columns, display_rows, truncated)
+        # print_results may wait on the user's confirmation for huge tables:
+        # run it in a thread so the event loop keeps running
+        shown = await asyncio.to_thread(
+            print_results, columns, display_rows, truncated
+        )
         return rows_for_model(columns, display_rows, truncated, shown)
 
     async def ask(self, question: str) -> str:
