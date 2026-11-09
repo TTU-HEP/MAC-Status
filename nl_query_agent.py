@@ -607,17 +607,10 @@ def apply_hep_style(plt):
     return hep
 
 
-def cms_label(ax, text="Internal", rlabel="TTU MAC"):
-    """CMS-style experiment label, placed manually so it stays put under
-    constrained layout (mplhep's own label drifts there)."""
-    ax.text(0, 1.012, "CMS", transform=ax.transAxes, ha="left", va="bottom",
-            fontweight="bold", fontsize=20)
-    ax.annotate(text, xy=(0, 1.012), xycoords="axes fraction",
-                xytext=(52, 0), textcoords="offset points",
-                va="bottom", fontstyle="italic", fontsize=15)
-    if rlabel:
-        ax.text(1, 1.012, rlabel, transform=ax.transAxes, ha="right",
-                va="bottom", fontsize=15)
+def cms_label(ax):
+    """HEP-style experiment label: "APD Lab", top-left above the axes."""
+    ax.text(0, 1.012, "APD Lab", transform=ax.transAxes, ha="left",
+            va="bottom", fontweight="bold", fontsize=20)
 
 
 def render_plot(columns, rows, spec) -> str:

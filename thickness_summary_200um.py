@@ -14,18 +14,12 @@ except ImportError:
     _hep = None
 
 
-def cms_label(ax, text="Internal", rlabel="TTU MAC"):
-    """CMS experiment label (manual placement, stable under constrained layout)."""
+def cms_label(ax):
+    """HEP-style experiment label: "APD Lab", top-left above the axes."""
     if _hep is None:
         return
-    ax.text(0, 1.012, "CMS", transform=ax.transAxes, ha="left", va="bottom",
-            fontweight="bold", fontsize=20)
-    ax.annotate(text, xy=(0, 1.012), xycoords="axes fraction",
-                xytext=(52, 0), textcoords="offset points",
-                va="bottom", fontstyle="italic", fontsize=15)
-    if rlabel:
-        ax.text(1, 1.012, rlabel, transform=ax.transAxes, ha="right",
-                va="bottom", fontsize=15)
+    ax.text(0, 1.012, "APD Lab", transform=ax.transAxes, ha="left",
+            va="bottom", fontweight="bold", fontsize=20)
 
 # ----------------------------------------
 # Load configuration
