@@ -227,7 +227,7 @@ def _render_env_png(source, rows, hours, part_rows=None):
         handles, labels = ax.get_legend_handles_labels()
         if handles:
             ax.legend(fontsize=11, frameon=False, loc="upper left",
-                      ncol=max(1, len(labels) // 6))
+                      bbox_to_anchor=(1.01, 1))
         if not groups:
             ax.text(0.5, 0.5, "no data in window", transform=ax.transAxes,
                     ha="center", color="#999")
@@ -248,7 +248,8 @@ def _render_env_png(source, rows, hours, part_rows=None):
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
         if part_rows:
-            ax.legend(fontsize=11, frameon=False, loc="upper left", ncol=3)
+            ax.legend(fontsize=11, frameon=False, loc="upper left",
+                      bbox_to_anchor=(1.01, 1))
         else:
             ax.text(0.5, 0.5, "no particle data in window",
                     transform=ax.transAxes, ha="center", color="#999")
@@ -256,7 +257,8 @@ def _render_env_png(source, rows, hours, part_rows=None):
         base.cms_label(axes[0])
     fig.suptitle(suptitle, fontsize=16)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110)
+    # bbox_inches="tight" grows the canvas around the outside legends
+    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
     plt.close(fig)
     return buf.getvalue()
 
