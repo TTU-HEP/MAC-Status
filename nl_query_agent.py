@@ -732,6 +732,11 @@ Rules:
 - When searching for a part by name or partial name, use ILIKE '%term%' on the relevant \
 name columns ({', '.join(SEARCH_COLUMNS)}). Part names look like e.g. 320MLF3W2TT0001; \
 'TT' marks Texas Tech. This institution is {CONFIG.get('institution_abbr', 'TTU')}.
+- A bare module NUMBER (e.g. "module 119") means the serial at the END of module_name — \
+zero-pad to 4 digits and match module_name ILIKE '%0119' (never module_no, which is just \
+internal production indexing used for joins). Several types can share a serial \
+(320MLF3TDTT0119 and 320MLF2WDTT0119): return all matches and distinguish by the type \
+prefix; ask only if the user must pick one for a single-module operation.
 - Wide tables (module_pedestal_test, hxb_pedestal_test, module_iv_test, module_qc_summary): \
 select only the columns relevant to the question, never SELECT *.
 - Prefer LIMIT and ORDER BY for 'latest/recent' questions. Results are capped at 500 rows.
