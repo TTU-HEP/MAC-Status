@@ -171,6 +171,19 @@ COMPLETENESS EXPECTATIONS (for "is everything there?" checks):
 proto_grade, module_grade, iv_grade and readout_grade, plus a grade_timestamp. \
 (final_grade_reason is routinely empty in practice — do not report that as a gap.) \
 A module with no module_qc_summary row has not been graded at all.
+- BROKEN MODULES and GRADE-F MODULES refer to overlapping information. When asked about \
+either (broken, damaged, failed, grade F), check BOTH module_info.damage_to_module = true \
+AND modules whose latest module_qc_summary row has final_grade = 'F', and report them \
+together, saying which category each module falls in. For every such module, state what \
+caused the failure from module_qc_summary: the final grade is the lowest subgrade, so name \
+the subgrade(s) at F or C (proto_grade, module_grade, iv_grade, readout_grade) and quote \
+the supporting fields — count_bad_cells and the sizes of list_dead_cells / list_noisy_cells \
+/ list_cells_unbonded / list_cells_grounded / list_highileak_cells for readout failures, \
+i_at_ref_a and i_at_half_v_dep against the IV thresholds for IV failures, the corner \
+colorgrade arrays for proto/module failures, plus comments_all and final_grade_reason when \
+present. Naming the failed subgrade and the values that breached the grading thresholds is \
+data lineage, not physical speculation (manual overrides register all subgrades as F — say \
+so when every subgrade is F).
 - module_qc_summary holds one row per grading RUN, many per module (about 17 on average). \
 When reporting grades, ALWAYS use only the most recent row per module: \
 SELECT DISTINCT ON (module_no) ... ORDER BY module_no, grade_timestamp DESC NULLS LAST, \
