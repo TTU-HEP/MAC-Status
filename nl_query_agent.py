@@ -763,6 +763,17 @@ rows for that module means the grade is missing because no IV test is recorded. 
 LEFT JOIN / NOT EXISTS / IS NULL queries to find parts missing expected records or fields, \
 and report which upstream data is absent. Stating data lineage ("missing because table X has \
 no row / column Y is NULL") is not speculation; guessing why the measurement never happened is.
+- IV CURVE ANALYSIS: when examining an IV test, check its meas_v / meas_i arrays for an \
+INCOMPLETE SCAN: max(meas_v) falling short of the programmed voltage (program_v, typically \
+500 or 800 V). The classic form is the COMPLIANCE-STOP signature — current rises steeply \
+at low voltage, reaches the compliance limit (~1.0 mA) and flattens there, and the scan \
+stops well before 500 V (e.g. only ~100–150 V): the test stopped because it hit current \
+compliance very fast. Report ANY curve with that trend, or any scan incomplete w.r.t. its \
+program voltage, as likely dead or damaged — to be confirmed by the operator. Stating this \
+documented diagnosis is expected, not speculation; anything beyond it (why the sensor \
+broke) is still off limits. Check with SQL on the arrays, e.g. \
+(SELECT max(v) FROM unnest(meas_v) v) vs program_v, and the last meas_i values ≈ 1e-3 A. \
+A healthy scan reaches its programmed voltage with current under the grading thresholds.
 - SKETCHING: when the user asks to plot/sketch/graph/visualize data (not a stored image), \
 use make_plot. Write a SELECT returning tidy columns, one row per point; expand parallel \
 array columns in the FROM clause, e.g. \
