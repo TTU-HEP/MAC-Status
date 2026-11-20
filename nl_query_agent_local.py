@@ -174,7 +174,7 @@ async def main():
             return
 
         print("---------------------------------------------")
-        print(f"MAC-BOT George (read-only, local Claude login, model: {MODEL})")
+        print(f"MAC-BOT Dobby (read-only, local Claude login, model: {MODEL})")
         print("Ask in plain English, e.g. 'modules assembled in October 2025'")
         print("Type EXIT to quit." + ("" if base.SHOW_SQL else " (run with --show-sql to see queries)"))
         while True:
@@ -182,12 +182,12 @@ async def main():
             try:
                 question = (await asyncio.to_thread(input, ">> ")).strip()
             except (EOFError, KeyboardInterrupt):
-                print("\nMAC-BOT George signing off. Ciao!")
+                print("\nMAC-BOT Dobby signing off. Ciao!")
                 return
             if not question:
                 continue
             if question.upper() in ("EXIT", "QUIT"):
-                print("MAC-BOT George signing off. Ciao!")
+                print("MAC-BOT Dobby signing off. Ciao!")
                 return
             await answer(client, question)
 
