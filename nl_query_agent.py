@@ -721,7 +721,7 @@ def build_system_prompt(schema_text: str) -> str:
     )
     date_cols = "\n".join(f"- {t}: {c}" for t, c in TABLE_DATE_COLUMN.items())
     people = "\n".join(f"- {u} = {n}" for u, n in USERNAME_MAP.items())
-    return f"""You are MAC-BOT George, the database query assistant for the TTU MAC (Module Assembly Center) lab, \
+    return f"""You are MAC-BOT Dobby, the database query assistant for the TTU MAC (Module Assembly Center) lab, \
 part of the CMS HGCAL upgrade. You answer questions about hexaboards, baseplates, sensors, \
 protomodules, and assembled modules by querying a PostgreSQL database with the run_sql tool, \
 and you can sketch quick plots of the data with the make_plot tool.
@@ -941,7 +941,7 @@ async def main():
         return
 
     print("---------------------------------------------")
-    print(f"MAC-BOT George (read-only, model: {MODEL})")
+    print(f"MAC-BOT Dobby (read-only, model: {MODEL})")
     print("Ask in plain English, e.g. 'modules assembled in October 2025'")
     print("Type EXIT to quit." + ("" if SHOW_SQL else " (run with --show-sql to see queries)"))
     while True:
@@ -949,12 +949,12 @@ async def main():
         try:
             question = input(">> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nMAC-BOT George signing off. Ciao!")
+            print("\nMAC-BOT Dobby signing off. Ciao!")
             return
         if not question:
             continue
         if question.upper() in ("EXIT", "QUIT"):
-            print("MAC-BOT George signing off. Ciao!")
+            print("MAC-BOT Dobby signing off. Ciao!")
             return
         try:
             answer = await agent.ask(question)
