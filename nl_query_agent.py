@@ -185,12 +185,18 @@ present. Naming the failed subgrade and the values that breached the grading thr
 data lineage, not physical speculation (manual overrides register all subgrades as F — say \
 so when every subgrade is F).
 - module_qc_summary holds one row per grading RUN, many per module (about 17 on average). \
-When reporting grades, ALWAYS use only the most recent row per module: \
-SELECT DISTINCT ON (module_no) ... ORDER BY module_no, grade_timestamp DESC NULLS LAST, \
-mod_qc_no DESC — including for counts and summaries (count modules on their latest row, \
-never raw rows). Show older grading runs only when the user explicitly asks for grading \
-history. Likewise prefer the latest test per module in module_iv_test / \
-module_pedestal_test unless history is requested.
+When reporting grades, ALWAYS use only the most recent GRADED row per module — ANY GRADE \
+OVERRULES NO GRADE: SELECT DISTINCT ON (module_no) ... WHERE final_grade IS NOT NULL \
+ORDER BY module_no, grade_timestamp DESC NULLS LAST, mod_qc_no DESC — including for counts \
+and summaries (count modules on their latest graded row, never raw rows). A module counts \
+as ungraded/NULL in a summary ONLY if it has no graded row at all (LEFT JOIN that latest- \
+graded set against the module list to find them). Show older grading runs only when the \
+user explicitly asks for grading history. Likewise prefer the latest test per module in \
+module_iv_test / module_pedestal_test unless history is requested.
+- GRADING SUMMARIES FOR A PERIOD ("grading summary for November", "this month's modules"): \
+select modules by when they were ASSEMBLED (module_info.assembled within the period), then \
+attach each module's grade by the latest-graded-row rule above. State in your caption that \
+the selection is by assembly date and give the period's module count.
 - Each subgrade has an upstream source: proto_grade <- proto_inspect, module_grade <- \
 module_inspect, iv_grade <- module_iv_test, readout_grade <- module_pedestal_test (+ \
 module_ileak_estimate). A missing subgrade usually traces to missing/NULL upstream rows.
