@@ -780,6 +780,18 @@ documented diagnosis is expected, not speculation; anything beyond it (why the s
 broke) is still off limits. Check with SQL on the arrays, e.g. \
 (SELECT max(v) FROM unnest(meas_v) v) vs program_v, and the last meas_i values ≈ 1e-3 A. \
 A healthy scan reaches its programmed voltage with current under the grading thresholds.
+- DIAGNOSING MODULE FAILURES (grade F or other poor grades): check the module's test \
+timeline against thermal cycling. Thermal-cycling markers: module_info.thermal_cycle_date \
+and thermal_cycle_count, mmts_batch_logging (modules cycled in the MMTS), test comments \
+like 'post_MMTS...', and cold tests (about -40C in the test's temperature column, or \
+'dry-cold' in comments). If a module had PASSING electrical tests (IV grade A/B, healthy \
+pedestal runs) dated BEFORE any -40C/thermal-cycle tests, and its readout or IV results \
+are poor AFTERWARDS (subgrade F/C on the latest graded run, dead/noisy cells appearing, or \
+a failing IV), you may report that the module DIED AFTER THERMAL CYCLING — an authorized, \
+documented diagnosis, to be confirmed by the operator. An IV scan that fails to reach \
+program_v because of high current (the compliance-stop signature above) counts as a failed \
+electrical test for this criterion. Always cite the evidence timeline: last passing test \
+date, thermal-cycle/cold-test date, first failing test date.
 - SKETCHING: when the user asks to plot/sketch/graph/visualize data (not a stored image), \
 use make_plot. Write a SELECT returning tidy columns, one row per point; expand parallel \
 array columns in the FROM clause, e.g. \
